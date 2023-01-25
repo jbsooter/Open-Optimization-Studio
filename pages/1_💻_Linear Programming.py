@@ -16,7 +16,7 @@ def load_constraints_grid(df):
 
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df, editable=True)
-    builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=","<",">"]})
+    builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=="]})
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
@@ -65,7 +65,6 @@ def solve_mip():
     colnames = st.session_state.df_mip.columns
     col_ind = 0
     for x in st.session_state.df_mip.iloc[0]:
-        st.write(x)
         #determine if variable is integer or continous
         if str(x)  == 'i':
             all_vars.append(solver.IntVar(0,infinity,colnames[col_ind]))
@@ -75,14 +74,12 @@ def solve_mip():
 
     #create constraints
     for index, row in st.session_state.df_mip.iterrows():
-        #skip i, c row
-        if index == 0:
-            continue
-        #every entry except inequality and rhs
-        if index < (len(row)-1):
+        #every entry except i/c
+        if index >= 1:
             #multiply coefficients and vars
             constraint_expression = 0
             i = 0
+            #every entry except rhs
             for coef in row[:-2]:
                 constraint_expression += float(coef)*all_vars[i]
                 i = i+1
@@ -116,16 +113,16 @@ def solve_mip():
     #solve model
     status = solver.Solve()
 
-    #report results
+    #report results and save message to session state
     if status != solver.OPTIMAL:
-        st.write("No optimal solution found!")
+        st.session_state.solution_message = "No optimal solution found!"
         if status == solver.FEASIBLE:
-            st.write("A potentially suboptimal solution was found")
+            st.session_state['solution_message'] += "A potentially suboptimal solution was found"
             solution_printer(solver=solver)
         else:
-            st.write("The solver could not solve the problem. ")
+            st.session_state['solution_message'] += "The solver could not solve the problem. "
     elif status == solver.OPTIMAL:
-        st.write(f"An optimal solution was found in {solver.wall_time()/1000.0} s.")
+        st.session_state['solution_message'] = f"An optimal solution was found in {solver.wall_time()/1000.0} s."
         solution_printer(solver=solver)
 
 
@@ -136,7 +133,7 @@ def solution_printer(solver):
     for x in solver.variables():
         if (x.name() != "inequality") & (x.name() != "RHS"):
             df_sol[x.name()] = pd.Series(x.SolutionValue())
-    st.write(df_sol)
+    st.session_state['last_solution'] = df_sol
 def download_mip():
     #in memory location for excel file
     buffer = io.BytesIO()
@@ -148,6 +145,17 @@ def download_mip():
         writer.close()
         return buffer
 
+def download_sol():
+    #in memory location for excel file
+    buffer = io.BytesIO()
+
+    #used writer to write multiple df to same sheet
+    with pd.ExcelWriter(buffer) as writer:
+        st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
+        st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
+        st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
+        writer.close()
+        return buffer
 def upload_mip():
     #get file from uploader TODO error on reset
     file_input = st.session_state.model_up
@@ -162,6 +170,8 @@ def upload_mip():
     df_mip.reset_index(drop=True, inplace=True)
     df_mip.columns = df_mip.iloc[0]
     df_mip = df_mip.drop(0)
+    #make sure index starts with 0
+    df_mip.reset_index(drop=True, inplace=True)
 
     #reset project data
     st.session_state.df_mip = df_mip
@@ -169,7 +179,7 @@ def upload_mip():
 def main():
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=",">"],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=","<="],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([1.0],dtype='double'), 'var2':pd.Series([45.0],dtype='double')})
 
@@ -196,6 +206,11 @@ def main():
         st.button(label="\+ Variable",on_click=add_column)
 
     st.button(label="Solve",on_click=solve_mip)
+
+    if 'last_solution' in st.session_state:
+        st.write(st.session_state['solution_message'])
+        st.write(st.session_state['last_solution'])
+        st.download_button(data=download_sol(), label="Download Solution",file_name="solution.xlsx")
 
     #allow for File I/O
     with st.sidebar:
