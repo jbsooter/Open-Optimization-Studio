@@ -1,6 +1,7 @@
 import io
 import streamlit as st
 import pandas as pd
+from numpy import double
 from st_aggrid import AgGrid, GridOptionsBuilder
 from ortools.linear_solver import pywraplp
 from openpyxl import load_workbook
@@ -76,19 +77,19 @@ def solve_mip():
             constraint_expression = 0
             i = 0
             for coef in row[:-2]:
-                constraint_expression += coef*all_vars[i]
+                constraint_expression += float(coef)*all_vars[i]
                 st.write(constraint_expression)
                 i = i+1
 
             #add constraint with appropriate inequality and rhs to model
             if(row["inequality"] == ">="):
-                solver.Add(constraint_expression>= row["RHS"])
+                solver.Add(constraint_expression>= float(row["RHS"]))
             elif row["inequality"] == "<=":
-                solver.Add(constraint_expression <= row["RHS"])
+                solver.Add(constraint_expression <= float(row["RHS"]))
             elif row["inequality"] == ">":
-                solver.Add(constraint_expression > row["RHS"])
+                solver.Add(constraint_expression > float(row["RHS"]))
             elif row["inequality"] == "<":
-                solver.Add(constraint_expression <  row["RHS"])
+                solver.Add(constraint_expression <  float(row["RHS"]))
 
     #create objective expression
     for index, row in st.session_state.df_obj.iterrows():
@@ -97,7 +98,7 @@ def solve_mip():
             i = 0
             #multiply coefficients and variables
             for coef in row[1:]:
-                obj_expression += coef*all_vars[i]
+                obj_expression += float(coef)*all_vars[i]
                 i = i+1
 
             #encode max min objective
@@ -108,9 +109,26 @@ def solve_mip():
 
     #solve model
     status = solver.Solve()
-    st.write(status)
-    st.write(solver.Objective().Value())
 
+    #report results
+    if status != solver.OPTIMAL:
+        st.write("No optimal solution found!")
+        if status == solver.FEASIBLE:
+            st.write("A potentially suboptimal solution was found")
+            solution_printer(solver=solver)
+        else:
+            st.write("The solver could not solve the problem. ")
+    elif status == solver.OPTIMAL:
+        st.write(f"An optimal solution was found in {solver.wall_time()/1000.0} s.")
+        solution_printer(solver=solver)
+
+
+def solution_printer(solver):
+    st.write(f"Objective Value: {solver.Objective().Value()}")
+    for x in solver.variables():
+        if (x.name() != "inequality") & (x.name() != "RHS"):
+            st.write(x.name() + " " + str(x.SolutionValue()))
+    #st.write(solver.variables()[0].SolutionValue())
 def download_mip():
     #in memory location for excel file
     buffer = io.BytesIO()
@@ -130,14 +148,12 @@ def upload_mip():
     #get the objective table and convert to dataframe
     df_obj = file_input_df.drop([x for x in range(1, len(file_input_df))])
     df_obj.pop(df_obj.columns.values[-1])
-    #st.write(df_obj)
 
     #get the constraint table and convert to dataframe
     df_mip = file_input_df.drop(x for x in range(0,3))
     df_mip.reset_index(drop=True, inplace=True)
     df_mip.columns = df_mip.iloc[0]
     df_mip = df_mip.drop(0)
-    #st.write(df_mip)
 
     #reset project data
     st.session_state.df_mip = df_mip
