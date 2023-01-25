@@ -10,7 +10,7 @@ def load_obj_grid(df):
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65)
+    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65, enable_enterprise_modules=False)
 
 def load_constraints_grid(df):
 
@@ -20,7 +20,7 @@ def load_constraints_grid(df):
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True)
+    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True, enable_enterprise_modules=False)
 
 def add_row():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
