@@ -176,7 +176,6 @@ def main():
     st.button(label="Solve",on_click=solve_mip)
 
     #allow for File I/O
-    #col_dl, col_ul, col_output = st.sidebar()
     with st.sidebar:
         st.download_button(data=download_mip(), label="Download Model",file_name="model.xlsx" )
         st.file_uploader(label="Upload Model",type='.xlsx',key="model_up",on_change=upload_mip)
