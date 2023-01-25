@@ -145,9 +145,9 @@ def upload_mip():
 def main():
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': [10.0, 2.0, 3.0], 'var2': [4.0, 5.0, 6.0],'inequality':[">=","<=",">"],'RHS':[13.0,1000.0,1000.0]})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series([10.0, 2.0, 3.0], dtype='double'), 'var2': pd.Series([4.0, 5.0, 6.0],dtype='double'),'inequality':[">=","<=",">"],'RHS':pd.Series([13.0,1000.0,1000.0],dtype='double')})
     if 'df_obj' not in st.session_state:
-        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': [1.0], 'var2': [45.0]})
+        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([1.0],dtype='double'), 'var2':pd.Series([45.0],dtype='double')})
 
     col1,col2 = st.columns([6,1])
     with col1:
@@ -176,10 +176,9 @@ def main():
     st.button(label="Solve",on_click=solve_mip)
 
     #allow for File I/O
-    col_dl, col_ul, col_output = st.columns([1,1,1])
-    with col_dl:
+    #col_dl, col_ul, col_output = st.sidebar()
+    with st.sidebar:
         st.download_button(data=download_mip(), label="Download Model",file_name="model.xlsx" )
-    with col_ul:
         st.file_uploader(label="Upload Model",type='.xlsx',key="model_up",on_change=upload_mip)
 
 if __name__ == "__main__":
