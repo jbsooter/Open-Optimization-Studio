@@ -1,7 +1,6 @@
 import io
 import streamlit as st
 import pandas as pd
-from numpy import double
 from st_aggrid import AgGrid, GridOptionsBuilder
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
@@ -52,7 +51,7 @@ def add_column():
 def solve_mip():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
     st.session_state['df_obj'] = st.session_state['aggrid_obj']['data']
-    st.write(st.session_state['df_mip'])
+
     # Create the mip solver with the SCIP backend.
     solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
@@ -77,7 +76,6 @@ def solve_mip():
             i = 0
             for coef in row[:-2]:
                 constraint_expression += float(coef)*all_vars[i]
-                st.write(constraint_expression)
                 i = i+1
 
             #add constraint with appropriate inequality and rhs to model
@@ -123,11 +121,13 @@ def solve_mip():
 
 
 def solution_printer(solver):
-    st.write(f"Objective Value: {solver.Objective().Value()}")
+    #dataframe to hold solution
+    df_sol = pd.DataFrame()
+    df_sol["obj"] = pd.Series(solver.Objective().Value())
     for x in solver.variables():
         if (x.name() != "inequality") & (x.name() != "RHS"):
-            st.write(x.name() + " " + str(x.SolutionValue()))
-    #st.write(solver.variables()[0].SolutionValue())
+            df_sol[x.name()] = pd.Series(x.SolutionValue())
+    st.write(df_sol)
 def download_mip():
     #in memory location for excel file
     buffer = io.BytesIO()
@@ -136,7 +136,6 @@ def download_mip():
     with pd.ExcelWriter(buffer) as writer:
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False)
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4)
-        #writer.save()
         writer.close()
         return buffer
 
