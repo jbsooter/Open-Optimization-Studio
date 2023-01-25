@@ -11,7 +11,7 @@ def load_obj_grid(df):
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65)
+    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65)
 
 def load_constraints_grid(df):
 
@@ -21,9 +21,10 @@ def load_constraints_grid(df):
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True)
+    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True)
 
 def add_row():
+    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
     #get existing
     old_df = st.session_state['df_mip']
 
@@ -36,6 +37,7 @@ def add_row():
     st.session_state['df_mip'] = pd.concat([old_df, new_row])
 
 def add_column():
+    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
     #get old data
     old_df = st.session_state['df_mip']
 
@@ -48,6 +50,9 @@ def add_column():
     st.session_state['df_obj'][f"var{ncols-1}"] = [0]
 
 def solve_mip():
+    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
+    st.session_state['df_obj'] = st.session_state['aggrid_obj']['data']
+    st.write(st.session_state['df_mip'])
     # Create the mip solver with the SCIP backend.
     solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
@@ -140,9 +145,9 @@ def upload_mip():
 def main():
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': [10, 2, 3], 'var2': [4, 5, 6],'inequality':[">=","<=",">"],'RHS':[13,1000,1000]})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': [10.0, 2.0, 3.0], 'var2': [4.0, 5.0, 6.0],'inequality':[">=","<=",">"],'RHS':[13.0,1000.0,1000.0]})
     if 'df_obj' not in st.session_state:
-        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': [1], 'var2': [45]})
+        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': [1.0], 'var2': [45.0]})
 
     col1,col2 = st.columns([6,1])
     with col1:
