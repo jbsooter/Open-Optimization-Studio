@@ -60,17 +60,26 @@ def solve_mip():
 
     #generate vars from df
     all_vars = []
-    for x in st.session_state.df_mip.columns[:len(st.session_state.df_mip.columns)]:
+
+    #index and list to name or-tools variables appropriately
+    colnames = st.session_state.df_mip.columns
+    col_ind = 0
+    for x in st.session_state.df_mip.iloc[0]:
+        st.write(x)
         #determine if variable is integer or continous
-        if x in st.session_state.int_vars:
-            all_vars.append(solver.IntVar(0,infinity,x))
-        else:
-            all_vars.append(solver.NumVar(0,infinity,x))
+        if str(x)  == 'i':
+            all_vars.append(solver.IntVar(0,infinity,colnames[col_ind]))
+        elif str(x) == 'c':
+            all_vars.append(solver.NumVar(0,infinity,colnames[col_ind]))
+        col_ind += 1
 
     #create constraints
     for index, row in st.session_state.df_mip.iterrows():
+        #skip i, c row
+        if index == 0:
+            continue
         #every entry except inequality and rhs
-        if index < (len(row)-2):
+        if index < (len(row)-1):
             #multiply coefficients and vars
             constraint_expression = 0
             i = 0
@@ -160,7 +169,7 @@ def upload_mip():
 def main():
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series([10.0, 2.0, 3.0], dtype='double'), 'var2': pd.Series([4.0, 5.0, 6.0],dtype='double'),'inequality':[">=","<=",">"],'RHS':pd.Series([13.0,1000.0,1000.0],dtype='double')})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=",">"],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([1.0],dtype='double'), 'var2':pd.Series([45.0],dtype='double')})
 
@@ -173,8 +182,6 @@ def main():
 
         #allow for additional constraints
         st.button(label="\+ Constraint",on_click=add_row)
-        #integrality constraints
-        st.multiselect("Integer Variables",st.session_state.df_mip.columns[:len(st.session_state.df_mip) -1],key='int_vars')
 
     with col2:
         #adding white space. More elegant solution?
