@@ -134,15 +134,15 @@ def download_mip():
 
     #used writer to write multiple df to same sheet
     with pd.ExcelWriter(buffer) as writer:
-        st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False)
-        st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4)
+        st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
+        st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
         writer.close()
         return buffer
 
 def upload_mip():
     #get file from uploader TODO error on reset
     file_input = st.session_state.model_up
-    file_input_df = pd.read_excel(file_input)
+    file_input_df = pd.read_excel(file_input, engine='openpyxl')
 
     #get the objective table and convert to dataframe
     df_obj = file_input_df.drop([x for x in range(1, len(file_input_df))])
