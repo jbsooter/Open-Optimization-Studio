@@ -158,8 +158,12 @@ def download_sol():
         return buffer
 def upload_mip():
     #get file from uploader TODO error on reset
-    file_input = st.session_state.model_up
-    file_input_df = pd.read_excel(file_input, engine='openpyxl')
+    if st.session_state.model_up is None:
+        #do not access buffer if this callback is the result of user deleting upload file
+        return
+    else:
+        file_input = st.session_state.model_up
+        file_input_df = pd.read_excel(file_input, engine='openpyxl')
 
     #get the objective table and convert to dataframe
     df_obj = file_input_df.drop([x for x in range(1, len(file_input_df))])
