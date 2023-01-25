@@ -4,7 +4,6 @@ import pandas as pd
 from numpy import double
 from st_aggrid import AgGrid, GridOptionsBuilder
 from ortools.linear_solver import pywraplp
-from openpyxl import load_workbook
 def load_obj_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df,editable=True)
@@ -137,7 +136,8 @@ def download_mip():
     with pd.ExcelWriter(buffer) as writer:
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False)
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4)
-        writer.save()
+        #writer.save()
+        writer.close()
         return buffer
 
 def upload_mip():
