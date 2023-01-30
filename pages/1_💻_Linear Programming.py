@@ -1,7 +1,7 @@
 import io
 import streamlit as st
 import pandas as pd
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
@@ -20,7 +20,7 @@ def load_constraints_grid(df):
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True, enable_enterprise_modules=False)
+    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
 
 def add_row():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
@@ -128,7 +128,7 @@ def solve_mip():
 
 def solution_printer(solver):
     #GLOP only
-    st.write(solver.constraints()[2].DualValue())
+    #st.write(solver.constraints()[2].DualValue())
     #dataframe to hold solution
     df_sol = pd.DataFrame()
     df_sol["obj"] = pd.Series(solver.Objective().Value())
@@ -144,7 +144,6 @@ def download_mip():
     with pd.ExcelWriter(buffer) as writer:
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
-        writer.close()
         return buffer
 
 def download_sol():
@@ -156,7 +155,6 @@ def download_sol():
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
         st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
-        writer.close()
         return buffer
 def upload_mip():
     #get file from uploader TODO error on reset
