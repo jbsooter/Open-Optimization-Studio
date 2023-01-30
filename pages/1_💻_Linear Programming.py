@@ -157,7 +157,7 @@ def download_sol():
         st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
         return buffer
 def upload_mip():
-    #get file from uploader TODO error on reset
+    #get file from uploader
     if st.session_state.model_up is None:
         #do not access buffer if this callback is the result of user deleting upload file
         return
@@ -182,6 +182,8 @@ def upload_mip():
     st.session_state.df_obj = df_obj
 def main():
     st.set_page_config(layout="wide")
+
+    st.title("Linear Programming")
     #initialize session default data
     if 'df_mip' not in st.session_state:
         st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=","<="],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
