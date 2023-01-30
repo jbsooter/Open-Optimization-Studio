@@ -13,7 +13,6 @@ def load_obj_grid(df):
     st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65, enable_enterprise_modules=False)
 
 def load_constraints_grid(df):
-
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df, editable=True)
     builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=="]})
@@ -125,7 +124,6 @@ def solve_mip():
         st.session_state['solution_message'] = f"An optimal solution was found in {solver.wall_time()/1000.0} s."
         solution_printer(solver=solver)
 
-
 def solution_printer(solver):
     #GLOP only
     #st.write(solver.constraints()[2].DualValue())
@@ -201,13 +199,9 @@ def main():
         st.button(label="\+ Constraint",on_click=add_row)
 
     with col2:
-        #adding white space. More elegant solution?
-        st.write("")
-        st.write("")
-        st.write("")
-        st.write("")
-        st.write("")
-        st.write("")
+        #adding white space. TODO: More elegant solution?
+        for x in range(0,6):
+            st.write("")
 
         #allow for additional variables
         st.button(label="\+ Variable",on_click=add_column)
