@@ -120,6 +120,7 @@ def solve_mip():
             solution_printer(solver=solver)
         else:
             st.session_state['solution_message'] += "The solver could not solve the problem. "
+            st.session_state['last_solution'] = pd.DataFrame()
     elif status == solver.OPTIMAL:
         st.session_state['solution_message'] = f"An optimal solution was found in {solver.wall_time()/1000.0} s."
         solution_printer(solver=solver)
@@ -211,7 +212,7 @@ def main():
     if 'last_solution' in st.session_state:
         st.write(st.session_state['solution_message'])
         st.write(st.session_state['last_solution'])
-        st.download_button(data=download_sol(), label="Download Solution",file_name="solution.xlsx")
+        st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
 
     #allow for File I/O
     with st.sidebar:
