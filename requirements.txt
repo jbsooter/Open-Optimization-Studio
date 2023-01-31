@@ -3,4 +3,4 @@ streamlit-aggrid
 ortools
 xlsxwriter
 openpyxl
-ics
+recurring-ical-events

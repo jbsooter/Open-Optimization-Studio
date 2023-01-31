@@ -1,8 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from io import StringIO
 
+import icalendar
+import numpy as np
 import pandas as pd
 import pytz
+import recurring_ical_events
 import streamlit as st
 from ics import Calendar
 from ortools.linear_solver import pywraplp
@@ -70,25 +73,35 @@ def generate_time_blocks(I,K,a_k,r_i):
     print(df_sol.to_string())
 
 def model_builder():
+    cal_df = st.session_state["calendar_df"]
+    #cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+    #cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+    cal_df["dur"] = cal_df["end"]- cal_df["begin"]
+    st.write(cal_df)
     #TODO: convert calendar and task inputs to model math
     st.write("coming soon!")
 def import_calendar():
-    cal = Calendar(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
-
-    events_dict = [event_to_dict(event) for event in cal.events]
+    cal = icalendar.Calendar.from_ical(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
+    events = recurring_ical_events.of(cal).between(datetime.today(),datetime.today() + timedelta(days=14))
+    events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
     st.session_state["calendar_df"] = events_df
 def event_to_dict(event):
     #https://www.youtube.com/watch?v=qRLkAZTc3GE
     return {
-        'name': event.name,
-        'begin': event.begin.datetime.astimezone(pytz.timezone('US/Central')),
-        'end': event.end.datetime.astimezone(pytz.timezone('US/Central')),
+        #'name': event["NAME"],
+        'begin': datetime(day=int(event["DTSTART"].dt.strftime("%d")),month=int(event["DTSTART"].dt.strftime("%m")),year=int(event["DTSTART"].dt.strftime("%Y")), hour=int(event["DTSTART"].dt.strftime("%H")),minute=int(event["DTSTART"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central')),
+        'end':datetime(day=int(event["DTEND"].dt.strftime("%d")),month=int(event["DTEND"].dt.strftime("%m")),year=int(event["DTEND"].dt.strftime("%Y")), hour=int(event["DTEND"].dt.strftime("%H")),minute=int(event["DTEND"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central'))
      }
 def main():
     st.write("coming soon!")
     st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
+
+    st.date_input("start",value=datetime.today(),key="begin_horizon")
+    st.date_input("end",value=datetime.today() + timedelta(days=7), key="end_horizon")
+
+    st.button("Optimize", on_click=model_builder)
 
 if __name__ == "__main__":
     main()
