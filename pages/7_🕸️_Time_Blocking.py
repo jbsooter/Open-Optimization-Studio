@@ -1,5 +1,10 @@
+from datetime import datetime
+from io import StringIO
+
 import pandas as pd
+import pytz
 import streamlit as st
+from ics import Calendar
 from ortools.linear_solver import pywraplp
 
 def generate_time_blocks(I,K,a_k,r_i):
@@ -64,8 +69,26 @@ def generate_time_blocks(I,K,a_k,r_i):
 
     print(df_sol.to_string())
 
+def model_builder():
+    #TODO: convert calendar and task inputs to model math
+    st.write("coming soon!")
+def import_calendar():
+    cal = Calendar(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
+
+    events_dict = [event_to_dict(event) for event in cal.events]
+    events_df = pd.DataFrame(events_dict)
+
+    st.session_state["calendar_df"] = events_df
+def event_to_dict(event):
+    #https://www.youtube.com/watch?v=qRLkAZTc3GE
+    return {
+        'name': event.name,
+        'begin': event.begin.datetime.astimezone(pytz.timezone('US/Central')),
+        'end': event.end.datetime.astimezone(pytz.timezone('US/Central')),
+     }
 def main():
     st.write("coming soon!")
+    st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
 
 if __name__ == "__main__":
     main()
