@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta, time
 from io import StringIO
+from math import trunc
 
 import icalendar
-import numpy as np
 import pandas as pd
 import pytz
 import recurring_ical_events
 import streamlit as st
-from ics import Calendar
 from ortools.linear_solver import pywraplp
 
 def generate_time_blocks(I,K,a_k,r_i):
@@ -25,7 +24,7 @@ def generate_time_blocks(I,K,a_k,r_i):
     for i in range(0,I):
         x_k = []
         for k in range(0,K):
-            x_k.append(solver.IntVar(0,1,'x' + str(i) + str(k)))
+            x_k.append(solver.IntVar(0,1,'x' + str(i) + " " + str(k)))
         x_ik.append(x_k)
 
     #is task i worked on during a cohesive block starting with period k?
@@ -41,7 +40,7 @@ def generate_time_blocks(I,K,a_k,r_i):
         for i in range(0,I):
             const_exp = 0
             for r in range(0,r_i[i]):
-                if k+ r < 12:
+                if k+ r < K:
                     const_exp += x_ik[i][k+r]
             solver.Add(const_exp >= r_i[i]*y_ik[i][k])
 
@@ -61,25 +60,83 @@ def generate_time_blocks(I,K,a_k,r_i):
             constraint_e += x_ik[i][k]
         solver.Add(constraint_e == r_i[i])
 
+    #maximize the number of tasks completed in a single contiguous stretch
     solver.Maximize(obj_exp)
-    solver.Solve()
+    status = solver.Solve()
 
+    #create dataframe to store output and only print if the variable is 1
     df_sol = pd.DataFrame()
     df_sol["obj"] = pd.Series(solver.Objective().Value())
     for x in solver.variables():
-        if (x.name() != "inequality") & (x.name() != "RHS"):
+        if (x.SolutionValue()  ==1):
             df_sol[x.name()] = pd.Series(x.SolutionValue())
 
-    print(df_sol.to_string())
+    st.write(df_sol)
+    st.write(status)
 
 def model_builder():
+    #retrieve calendar dataframe from session state
     cal_df = st.session_state["calendar_df"]
-    #cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
-    #cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+
+    #remove events that are not within the timeframe
+    cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+    cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+
+    #create event duration column
     cal_df["dur"] = cal_df["end"]- cal_df["begin"]
-    st.write(cal_df)
-    #TODO: convert calendar and task inputs to model math
-    st.write("coming soon!")
+
+    #calculate timedelta between beginning of horizon and beginnin/end of event
+    cal_df["bpd"] = cal_df["begin"] - datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
+    cal_df["epd"] = cal_df["end"] - datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
+
+    #transform the timedelta between beginning of horizon and beginning of event to a period index
+    period = []
+    for index, row in cal_df.iterrows():
+        period.append(trunc((row["bpd"].total_seconds()/60)/15))
+    cal_df["begin_pd"] = period
+
+    #transform the timedelta between beginning of horizon and end of event to a period index
+    period = []
+    for index, row in cal_df.iterrows():
+        period.append(trunc((row["epd"].total_seconds()/60)/15))
+    cal_df["end_pd"] = period
+
+    #calculate number of 15 minute periods on planning horizon
+    horizon_length_days = datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))- datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
+    horizon_length_mins = horizon_length_days.days*24*60
+    num_periods = horizon_length_mins/15
+
+    #build list for period availability, making period unavailable if alread unoccupied by event
+    a_k = []
+    off_calc = 0
+    for k in range(0,int(num_periods)):
+        avail = 0
+        for index, row in cal_df.iterrows():
+            if (k >= row["begin_pd"]) &( k <= row["end_pd"]):
+                avail = 0
+                break
+            else:
+                avail = 1
+
+        a_k.append(avail)
+
+    #make a period unavailable if it is before 8 AM or after 8 PM
+    for k in range(0,int(num_periods)):
+        #none before 8 AM
+        if off_calc < 8*4:
+            a_k[k] =0
+
+        #none after 8 PM
+        if off_calc > 20*4:
+            a_k[k]  = 0
+        if(off_calc < 24*4):
+            off_calc += 1
+        else:
+            off_calc = 0
+
+    #solve the model
+    generate_time_blocks(3,int(num_periods),a_k,[1,2,16])
+
 def import_calendar():
     cal = icalendar.Calendar.from_ical(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
     events = recurring_ical_events.of(cal).between(datetime.today(),datetime.today() + timedelta(days=14))
