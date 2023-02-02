@@ -137,10 +137,10 @@ def model_builder():
     generate_time_blocks(3,int(num_periods),a_k,[1,2,16])
 
 def import_calendar():
-    if st.session_state.model_up is None:
+    if st.session_state.calendar_ics is None:
         #do not access buffer if this callback is the result of user deleting upload file
         return
-    
+
     cal = icalendar.Calendar.from_ical(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
     events = recurring_ical_events.of(cal).between(datetime.today(),datetime.today() + timedelta(days=14))
     events_dict = [event_to_dict(event) for event in events]
