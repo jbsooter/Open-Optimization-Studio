@@ -143,11 +143,12 @@ def import_calendar():
     events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
+    st.write(events_df)
     st.session_state["calendar_df"] = events_df
 def event_to_dict(event):
     #https://www.youtube.com/watch?v=qRLkAZTc3GE
     return {
-        #'name': event["NAME"],
+        'name': event["SUMMARY"],
         'begin': datetime(day=int(event["DTSTART"].dt.strftime("%d")),month=int(event["DTSTART"].dt.strftime("%m")),year=int(event["DTSTART"].dt.strftime("%Y")), hour=int(event["DTSTART"].dt.strftime("%H")),minute=int(event["DTSTART"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central')),
         'end':datetime(day=int(event["DTEND"].dt.strftime("%d")),month=int(event["DTEND"].dt.strftime("%m")),year=int(event["DTEND"].dt.strftime("%Y")), hour=int(event["DTEND"].dt.strftime("%H")),minute=int(event["DTEND"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central'))
      }
