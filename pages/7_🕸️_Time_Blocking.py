@@ -78,7 +78,7 @@ def model_builder():
     cal_df = st.session_state["calendar_df"]
 
     #remove events that are not within the timeframe
-    cal_df = cal_df[cal_df["begin"] >= st.session_state["begin_horizaon"]]
+    cal_df = cal_df[cal_df["begin"] >= st.session_state["begin_horizon"]]
     cal_df = cal_df[cal_df["end"] <= st.session_state["end_horizon"]]
 
     #create event duration column
