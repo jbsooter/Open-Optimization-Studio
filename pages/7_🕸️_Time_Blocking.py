@@ -79,15 +79,15 @@ def model_builder():
     cal_df = st.session_state["calendar_df"]
 
     #remove events that are not within the timeframe
-    cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
-    cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))]
+    cal_df = cal_df[cal_df["begin"] >= st.session_state["begin_horizaon"]]
+    cal_df = cal_df[cal_df["end"] <= st.session_state["end_horizon"]]
 
     #create event duration column
     cal_df["dur"] = cal_df["end"]- cal_df["begin"]
 
-    #calculate timedelta between beginning of horizon and beginnin/end of event
-    cal_df["bpd"] = cal_df["begin"] - datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
-    cal_df["epd"] = cal_df["end"] - datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
+    #calculate timedelta between beginning of horizon and beginning/end of event
+    cal_df["bpd"] = cal_df["begin"] - st.session_state["begin_horizon"]
+    cal_df["epd"] = cal_df["end"] - st.session_state["begin_horizon"]
 
     #transform the timedelta between beginning of horizon and beginning of event to a period index
     period = []
@@ -102,9 +102,10 @@ def model_builder():
     cal_df["end_pd"] = period
 
     #calculate number of 15 minute periods on planning horizon
-    horizon_length_days = datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=pytz.timezone('US/Central'))- datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=pytz.timezone('US/Central'))
+    horizon_length_days = st.session_state["end_horizon"] - st.session_state["begin_horizon"]
     horizon_length_mins = horizon_length_days.days*24*60
     num_periods = horizon_length_mins/15
+    st.write(horizon_length_days)
 
     #build list for period availability, making period unavailable if alread unoccupied by event
     a_k = []
@@ -117,7 +118,6 @@ def model_builder():
                 break
             else:
                 avail = 1
-
         a_k.append(avail)
 
     #make a period unavailable if it is before 8 AM or after 8 PM
@@ -146,11 +146,12 @@ def import_calendar():
     st.write(events_df)
     st.session_state["calendar_df"] = events_df
 def event_to_dict(event):
+    #st.write(event["DTSTART"].dt.tzinfo)
     #https://www.youtube.com/watch?v=qRLkAZTc3GE
     return {
         'name': event["SUMMARY"],
-        'begin': datetime(day=int(event["DTSTART"].dt.strftime("%d")),month=int(event["DTSTART"].dt.strftime("%m")),year=int(event["DTSTART"].dt.strftime("%Y")), hour=int(event["DTSTART"].dt.strftime("%H")),minute=int(event["DTSTART"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central')),
-        'end':datetime(day=int(event["DTEND"].dt.strftime("%d")),month=int(event["DTEND"].dt.strftime("%m")),year=int(event["DTEND"].dt.strftime("%Y")), hour=int(event["DTEND"].dt.strftime("%H")),minute=int(event["DTEND"].dt.strftime("%M"))).astimezone(pytz.timezone('US/Central'))
+        'begin': event["DTSTART"].dt,
+        'end':event["DTEND"].dt
      }
 def main():
     st.write("coming soon!")
