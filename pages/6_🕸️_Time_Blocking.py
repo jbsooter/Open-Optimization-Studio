@@ -8,16 +8,15 @@ import recurring_ical_events
 import streamlit as st
 from ortools.linear_solver import pywraplp
 
+'''
+I = number of tasks to complete
+K = number of periods on the planning horizon
+a_k = 1 if period available, o.w 0
+r_i = required number of 15 min periods to complete task i
+'''
 def generate_time_blocks(I,K,a_k,r_i):
     # Create the mip solver with the SCIP backend.
     solver = pywraplp.Solver.CreateSolver('SCIP')
-
-    #I = 5 #num tasks will be generated from input
-    #K = 12 #num_periods will be generated from calendar window and working hours
-
-    #a_k = [0,0,0,1,1,1,1,1,1,1,1,1] #allowed periods (will be generated from calendar
-    #r_i = [2,1,1,2,1] #required number of periods to complete task i
-
 
     x_ik = [] #is task i worked on during period k?
     for i in range(0,I):
@@ -70,6 +69,7 @@ def generate_time_blocks(I,K,a_k,r_i):
         if (x.SolutionValue()  ==1):
             df_sol[x.name()] = pd.Series(x.SolutionValue())
 
+    #print solution and solver status to screen
     st.write(df_sol)
     st.write(status)
 
@@ -104,9 +104,8 @@ def model_builder():
     horizon_length_days = st.session_state["end_horizon"] - st.session_state["begin_horizon"]
     horizon_length_mins = horizon_length_days.days*24*60
     num_periods = horizon_length_mins/15
-    st.write(horizon_length_days)
 
-    #build list for period availability, making period unavailable if alread unoccupied by event
+    #build list for period availability, making period unavailable if alread unoccupied by calendar event
     a_k = []
     off_calc = 0
     for k in range(0,int(num_periods)):
@@ -133,7 +132,7 @@ def model_builder():
         else:
             off_calc = 0
 
-    #solve the model
+    #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,16 task lengths
     generate_time_blocks(3,int(num_periods),a_k,[1,2,16])
 
 def import_calendar():
@@ -141,15 +140,16 @@ def import_calendar():
         #do not access buffer if this callback is the result of user deleting upload file
         return
 
+    #read in ics file, convert to dataframe using event to dict and list comprehension
     cal = icalendar.Calendar.from_ical(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
     events = recurring_ical_events.of(cal).between(datetime.today(),datetime.today() + timedelta(days=14))
     events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
+    #write df to screen and save to session state
     st.write(events_df)
     st.session_state["calendar_df"] = events_df
 def event_to_dict(event):
-    #st.write(event["DTSTART"].dt.tzinfo)
     #https://www.youtube.com/watch?v=qRLkAZTc3GE
     return {
         'name': event["SUMMARY"],
@@ -157,13 +157,12 @@ def event_to_dict(event):
         'end':event["DTEND"].dt
      }
 def main():
-    st.write("coming soon!")
     st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
 
-    st.date_input("start",value=datetime.today(),key="begin_horizon")
-    st.date_input("end",value=datetime.today() + timedelta(days=7), key="end_horizon")
+    st.date_input("Start",value=datetime.today(),key="begin_horizon")
+    st.date_input("End",value=datetime.today() + timedelta(days=7), key="end_horizon")
 
-    st.button("Optimize", on_click=model_builder)
+    st.button("Create Time Blocks", on_click=model_builder)
 
 if __name__ == "__main__":
     main()
