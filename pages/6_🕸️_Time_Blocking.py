@@ -7,6 +7,7 @@ import pandas as pd
 import recurring_ical_events
 import streamlit as st
 from ortools.linear_solver import pywraplp
+from utilities import dateutils
 
 
 def generate_time_blocks(I,K,a_k,r_i):
@@ -119,24 +120,42 @@ def model_builder():
                 avail = 1
         a_k.append(avail)
 
-    #make a period unavailable if it is before 8 AM or after 8 PM
-    #TODO: Widgets to modify available periods
-    off_calc = 0
+    #get day of week of start of time horion
+    current_day = st.session_state["begin_horizon"].weekday()
+    #period in day tracker
+    period_in_day = 0
+    #forall periods on horizon
     for k in range(0,int(num_periods)):
         #none before 8 AM
-        if off_calc < 8*4:
+        #TODO: 8 AM to widget
+        if period_in_day < 8*4:
             a_k[k] =0
 
         #none after 8 PM
-        if off_calc > 20*4:
+        #TODO: 8 PM to widget
+        if period_in_day > 20*4:
             a_k[k]  = 0
-        if(off_calc < 24*4):
-            off_calc += 1
-        else:
-            off_calc = 0
 
-    #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,16 task lengths
-    generate_time_blocks(3,int(num_periods),a_k,[1,2,3])
+        #if day is not a workday then make it unavailable
+        for weekday in range(0,7):
+            if (current_day == weekday) & (st.session_state[f"workday_{dateutils.day_of_week_int_to_str(weekday)}"] is False):
+                a_k[k] = 0
+
+        #increment period within day if there are periods remaining
+        if(period_in_day < 24*4):
+            period_in_day += 1
+        #else adjust current day and reset period in day to 0
+        else:
+            period_in_day = 0
+            #if at end of integer range, reset to Monday (0)
+            if(current_day >=6):
+                current_day = 0
+            #else increment the day of week
+            else:
+                current_day += 1
+
+    #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,3 task lengths
+    generate_time_blocks(3,int(num_periods),a_k,[1,2,9])
 
 def import_calendar():
     if st.session_state.calendar_ics is None:
