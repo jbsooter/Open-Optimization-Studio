@@ -7,6 +7,8 @@ import pandas as pd
 import recurring_ical_events
 import streamlit as st
 from ortools.linear_solver import pywraplp
+
+import utilities.dateutils
 from utilities import dateutils
 
 
@@ -126,14 +128,12 @@ def model_builder():
     period_in_day = 0
     #forall periods on horizon
     for k in range(0,int(num_periods)):
-        #none before 8 AM
-        #TODO: 8 AM to widget
-        if period_in_day < 8*4:
+        #none before working hours
+        if period_in_day < dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][0])*4:
             a_k[k] =0
 
-        #none after 8 PM
-        #TODO: 8 PM to widget
-        if period_in_day > 20*4:
+        #none after working hours
+        if period_in_day > dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][1])*4:
             a_k[k]  = 0
 
         #if day is not a workday then make it unavailable
@@ -186,7 +186,13 @@ def main():
     st.date_input("End",value=datetime.today() + timedelta(days=7), key="end_horizon")
 
     for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
-        st.checkbox(label=x, key=('workday_'+x))
+        col1,col2 = st.columns([1,3])
+        with col1:
+            st.checkbox(label=x, key=('workday_'+x))
+            st.write(' ')
+        with col2:
+            st.select_slider(label='Working Hours',key=('hours_'+x),options=utilities.dateutils.working_hours_list,value=('8 AM', '5 PM'))
+
     st.button("Create Time Blocks", on_click=model_builder)
 
 if __name__ == "__main__":
