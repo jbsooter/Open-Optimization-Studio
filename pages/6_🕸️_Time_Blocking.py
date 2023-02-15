@@ -8,7 +8,6 @@ import recurring_ical_events
 import streamlit as st
 from ortools.linear_solver import pywraplp
 
-import utilities.timeblockingutils
 from utilities import timeblockingutils
 
 
@@ -50,10 +49,6 @@ def generate_time_blocks(I,K,a_k,r_i):
     for i in range(0,I):
         for k in range(0,K):
             solver.Add(a_k[k] >= x_ik[i][k])
-    obj_exp = 0
-    for y in y_ik:
-        for z in y:
-            obj_exp+= z
 
     #task single completion constraint
     for i in range(0,I):
@@ -70,6 +65,11 @@ def generate_time_blocks(I,K,a_k,r_i):
         solver.Add(constraint <= 1)
 
     #maximize the number of tasks completed in a single contiguous stretch
+    obj_exp = 0
+    for y in y_ik:
+        for z in y:
+            obj_exp+= z
+
     solver.Maximize(obj_exp)
     status = solver.Solve()
 
@@ -136,16 +136,16 @@ def model_builder():
     #forall periods on horizon
     for k in range(0,int(num_periods)):
         #none before working hours
-        if period_in_day < dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][0])*4:
+        if period_in_day < timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4:
             a_k[k] =0
 
         #none after working hours
-        if period_in_day >= dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][1])*4:
+        if period_in_day >= timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1])*4:
             a_k[k]  = 0
 
         #if day is not a workday then make it unavailable
         for weekday in range(0,7):
-            if (current_day == weekday) & (st.session_state[f"workday_{dateutils.day_of_week_int_to_str(weekday)}"] is False):
+            if (current_day == weekday) & (st.session_state[f"workday_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is False):
                 a_k[k] = 0
 
         #increment period within day if there are periods remaining
@@ -164,7 +164,7 @@ def model_builder():
     #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,3 task lengths
     r_i = []
     for x in range(0,st.session_state['number_of_tasks']):
-        r_i.append(dateutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
+        r_i.append(timeblockingutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
     generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,r_i)
 
 def import_calendar():
@@ -204,7 +204,7 @@ def main():
             st.checkbox(label=x, key=('workday_'+x))
             st.write(' ')
         with col2:
-            st.select_slider(label='Working Hours',key=('hours_'+x),options=utilities.dateutils.working_hours_list,value=('8 AM', '5 PM'))
+            st.select_slider(label='Working Hours',key=('hours_'+x),options=timeblockingutils.working_hours_list,value=('8 AM', '5 PM'))
 
     #create task insertion
     if 'number_of_tasks' not in st.session_state:
@@ -215,7 +215,7 @@ def main():
         with col1:
             st.text_input(label='Task Name',value=f"Task {x+1}",key=f"task_{x+1}")
         with col2:
-            st.selectbox(label='Task Length',options=dateutils.time_increments_list,key=f"task_{x+1}_time")
+            st.selectbox(label='Task Length',options=timeblockingutils.time_increments_list,key=f"task_{x+1}_time")
     #run optimization model
     st.button("Create Time Blocks", on_click=model_builder)
 
