@@ -8,8 +8,8 @@ import recurring_ical_events
 import streamlit as st
 from ortools.linear_solver import pywraplp
 
-import utilities.dateutils
-from utilities import dateutils
+import utilities.timeblockingutils
+from utilities import timeblockingutils
 
 
 def generate_time_blocks(I,K,a_k,r_i):
