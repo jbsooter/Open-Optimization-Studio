@@ -31,6 +31,24 @@ def working_hour_str_to_num(hour_str):
         '11 PM':23,
         '12 AM':24
     }
-    return kv[hour_str]
+    return kv[hour_str]-1
 
 working_hours_list = ['6 AM','7 AM','8 AM','9 AM','10 AM','11 AM','12 PM','1 PM','2 PM','3 PM','4 PM','5 PM','6 PM','7 PM','8 PM','9 PM','10 PM','11 PM','12 AM']
+
+time_increments_list = ['15 min','30 min','45 min','1 hr','1.25 hrs','1.5 hrs','1.75 hrs','2 hrs','2.25 hrs','2.5 hrs','2.75 hrs','3 hrs']
+
+def time_increment_to_num_periods(time_increment):
+    kv= {'15 min':1,
+         '30 min':2,
+         '45 min':3,
+         '1 hr':4,
+         '1.25 hrs':5,
+         '1.5 hrs':6,
+         '1.75 hrs':7,
+         '2 hrs':8,
+         '2.25 hrs':9,
+         '2.5 hrs':10,
+         '2.75 hrs':11,
+         '3 hrs':12
+         }
+    return kv[time_increment]

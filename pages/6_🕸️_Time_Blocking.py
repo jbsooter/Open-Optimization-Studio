@@ -62,6 +62,13 @@ def generate_time_blocks(I,K,a_k,r_i):
             constraint_e += x_ik[i][k]
         solver.Add(constraint_e == r_i[i])
 
+    #one task per period
+    for k in range(0,K):
+        constraint = 0
+        for i in range(0,I):
+            constraint+= x_ik[i][k]
+        solver.Add(constraint <= 1)
+
     #maximize the number of tasks completed in a single contiguous stretch
     solver.Maximize(obj_exp)
     status = solver.Solve()
@@ -71,8 +78,8 @@ def generate_time_blocks(I,K,a_k,r_i):
     for i in range(0,len(x_ik)):
         for k in range(0,K):
             if x_ik[i][k].SolutionValue() > 0:
-                st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
-                st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15))))
+                st.write(st.session_state[f"task_{i+1}"] + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
+                #st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15))))
     st.write(status)
     st.write(solver.Objective().Value())
 
@@ -133,7 +140,7 @@ def model_builder():
             a_k[k] =0
 
         #none after working hours
-        if period_in_day > dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][1])*4:
+        if period_in_day >= dateutils.working_hour_str_to_num(st.session_state[f'hours_{dateutils.day_of_week_int_to_str(current_day)}'][1])*4:
             a_k[k]  = 0
 
         #if day is not a workday then make it unavailable
@@ -155,7 +162,10 @@ def model_builder():
                 current_day += 1
 
     #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,3 task lengths
-    generate_time_blocks(3,int(num_periods),a_k,[1,2,9])
+    r_i = []
+    for x in range(0,st.session_state['number_of_tasks']):
+        r_i.append(dateutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
+    generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,r_i)
 
 def import_calendar():
     if st.session_state.calendar_ics is None:
@@ -180,11 +190,14 @@ def event_to_dict(event):
         'end':event["DTEND"].dt
      }
 def main():
+    #upload ics file
     st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
 
+    #input planning horizon
     st.date_input("Start",value=datetime.today(),key="begin_horizon")
     st.date_input("End",value=datetime.today() + timedelta(days=7), key="end_horizon")
 
+    #create work day and time insertion
     for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
         col1,col2 = st.columns([1,3])
         with col1:
@@ -193,7 +206,19 @@ def main():
         with col2:
             st.select_slider(label='Working Hours',key=('hours_'+x),options=utilities.dateutils.working_hours_list,value=('8 AM', '5 PM'))
 
+    #create task insertion
+    if 'number_of_tasks' not in st.session_state:
+        st.session_state['number_of_tasks'] = 3
+
+    for x in range(0,st.session_state['number_of_tasks']):
+        col1,col2 = st.columns([1,1])
+        with col1:
+            st.text_input(label='Task Name',value=f"Task {x+1}",key=f"task_{x+1}")
+        with col2:
+            st.selectbox(label='Task Length',options=dateutils.time_increments_list,key=f"task_{x+1}_time")
+    #run optimization model
     st.button("Create Time Blocks", on_click=model_builder)
+
 
 if __name__ == "__main__":
     main()
