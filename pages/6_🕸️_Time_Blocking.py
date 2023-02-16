@@ -11,13 +11,14 @@ from ortools.linear_solver import pywraplp
 from utilities import timeblockingutils
 
 
-def generate_time_blocks(I,K,a_k,p_k,r_i):
+def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     """
     I = number of tasks to complete
     K = number of periods on the planning horizon
     a_k = 1 if period available, o.w 0
     p_k = 1 if period k is not preferred, 2 if period k is preferred
     r_i = required number of 15 min periods to complete task i
+    d_i = period that task i is due
     """
     # Create the mip solver with the SCIP backend.
     solver = pywraplp.Solver.CreateSolver('SCIP')
@@ -64,6 +65,12 @@ def generate_time_blocks(I,K,a_k,p_k,r_i):
         for i in range(0,I):
             constraint+= x_ik[i][k]
         solver.Add(constraint <= 1)
+
+    #task must be completed before due date
+    for i in range(0,I):
+        for k in range(0,K):
+            if k >= d_i[i]:
+                solver.Add(x_ik[i][k] == 0)
 
     #maximize the number of tasks completed in a single contiguous stretch
     obj_exp = 0
@@ -174,7 +181,15 @@ def model_builder():
     for x in range(0,st.session_state['number_of_tasks']):
         r_i.append(timeblockingutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
 
-    generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,p_k,r_i)
+    #create due date in terms of period
+    d_i = []
+    for x in range(0,st.session_state['number_of_tasks']):
+        #difference between due date and begin horizon date + 1 day. 24*4 is the plus one day in periods and exists because due dates are
+        #assumed to be EOD
+        d_i.append(trunc(((st.session_state[f'task_{x+1}_due'] - st.session_state['begin_horizon']).total_seconds()/60)/15) + 24*4)
+
+    st.write(d_i)
+    generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,p_k,r_i,d_i)
 
 def import_calendar():
     if st.session_state.calendar_ics is None:
@@ -226,11 +241,13 @@ def main():
         st.session_state['number_of_tasks'] = 3
 
     for x in range(0,st.session_state['number_of_tasks']):
-        col1,col2 = st.columns([1,1])
+        col1,col2,col3 = st.columns([1,1,1])
         with col1:
             st.text_input(label='Task Name',value=f"Task {x+1}",key=f"task_{x+1}")
         with col2:
             st.selectbox(label='Task Length',options=timeblockingutils.time_increments_list,key=f"task_{x+1}_time")
+        with col3:
+            st.date_input(label="Due EOD",value=st.session_state["end_horizon"],key=f"task_{x+1}_due")
 
     st.button(label="+ Task", on_click=add_task)
     #run optimization model
