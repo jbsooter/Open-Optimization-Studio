@@ -189,6 +189,9 @@ def event_to_dict(event):
         'begin': event["DTSTART"].dt,
         'end':event["DTEND"].dt
      }
+
+def add_task():
+    st.session_state["number_of_tasks"] = st.session_state["number_of_tasks"] + 1
 def main():
     #upload ics file
     st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
@@ -197,14 +200,17 @@ def main():
     st.date_input("Start",value=datetime.today(),key="begin_horizon")
     st.date_input("End",value=datetime.today() + timedelta(days=7), key="end_horizon")
 
-    #create work day and time insertion
-    for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
-        col1,col2 = st.columns([1,3])
-        with col1:
-            st.checkbox(label=x, key=('workday_'+x))
-            st.write(' ')
-        with col2:
-            st.select_slider(label='Working Hours',key=('hours_'+x),options=timeblockingutils.working_hours_list,value=('8 AM', '5 PM'))
+    work_time_expander = st.expander(label="Change Working Days/Hours")
+
+    with work_time_expander:
+        #create work day and time insertion
+        for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
+            col1,col2 = st.columns([1,3])
+            with col1:
+                st.checkbox(label=x, key=('workday_'+x))
+                st.write(' ')
+            with col2:
+                st.select_slider(label='Working Hours',key=('hours_'+x),options=timeblockingutils.working_hours_list,value=('8 AM', '5 PM'))
 
     #create task insertion
     if 'number_of_tasks' not in st.session_state:
@@ -216,6 +222,8 @@ def main():
             st.text_input(label='Task Name',value=f"Task {x+1}",key=f"task_{x+1}")
         with col2:
             st.selectbox(label='Task Length',options=timeblockingutils.time_increments_list,key=f"task_{x+1}_time")
+
+    st.button(label="+ Task", on_click=add_task)
     #run optimization model
     st.button("Create Time Blocks", on_click=model_builder)
 
