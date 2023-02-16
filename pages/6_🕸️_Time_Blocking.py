@@ -97,16 +97,32 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
 
     #Calendar view test
     #TODO Support calendar view output for same event non contigious assigned periods
+    #set calendar frame of reference
+    begin_list = []
+    end_list = []
+    for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
+        begin_time_info = st.session_state[f'hours_{x}'][0].split()
+        if begin_time_info[1] == 'AM':
+            begin_list.append(int(begin_time_info[0]))
+        elif begin_time_info[1] == 'PM':
+            begin_list.append(int(begin_time_info[0]) + 12)
+
+        end_time_info = st.session_state[f'hours_{x}'][1].split()
+        if end_time_info[1] == 'AM':
+            end_list.append(int(end_time_info[0]))
+        elif end_time_info[1] == 'PM':
+            end_list.append(int(end_time_info[0]) + 12)
+
     config = CalendarConfig(
         lang='en',
         title='Task Schedule',
         dates=st.session_state['begin_horizon'].isoformat() + ' - '+st.session_state['end_horizon'].isoformat(),
-        hours='8 - 22',
+        #TODO fix hours to match min max
+        #hours='8 - 22',
+        hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1),
         show_date=True,
         legend=False,
         title_vertical_align='top',
-
-
     )
     task_calendar = Calendar.build(config)
     for i in range(0,len(x_ik)):
@@ -118,15 +134,57 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                 pd_start_list.append(dateTimeObj)
 
                 #st.write(dateTimeObj.time().strftime('%H:%M'))
-        start = min(pd_start_list)
-        end = max(pd_start_list) + timedelta(minutes=15)
-        task_calendar.add_event(
-            title = st.session_state[f'task_{i+1}'],
-            day=start.date(),
-            start = start.time().strftime('%H:%M'),
-            end = end.time().strftime('%H:%M'),
-            style = EventStyles.RED
-        )
+
+        #Support discontinous work periods
+
+        #track start index of latest work period
+        start_index = 0
+        #iterate all start dates for current task
+        for j in range(0,len(pd_start_list)):
+
+            #split blocks if indicated by greater than 15 min diff in start time
+            if(pd_start_list[j] - pd_start_list[j-1] > timedelta(minutes=15)):
+                start = min(pd_start_list[start_index:j-1])
+                end = max(pd_start_list[start_index:j-1]) + timedelta(minutes=15)
+
+                task_calendar.add_event(
+                    title = st.session_state[f'task_{i+1}'],
+                    day=start.date(),
+                    start = start.time().strftime('%H:%M'),
+                    end = end.time().strftime('%H:%M'),
+                    style = EventStyles.GREEN,
+                    notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
+                    )
+                #set start index for next round to be after this block
+                start_index = j
+
+            #if last index (j) and there has been a prior block for the task
+            if (j == len(pd_start_list)-1) &( start_index != 0):
+                start = pd_start_list[-1]
+                end = pd_start_list[-1] + timedelta(minutes=15)
+
+                task_calendar.add_event(
+                    title = st.session_state[f'task_{i+1}'],
+                    day=start.date(),
+                    start = start.time().strftime('%H:%M'),
+                    end = end.time().strftime('%H:%M'),
+                    style = EventStyles.GREEN,
+                    notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
+                )
+            #if j is last elements index and there has been no prior block
+            if (j == len(pd_start_list)-1) &( start_index == 0):
+                start = pd_start_list[0]
+                end = pd_start_list[-1] + timedelta(minutes=15)
+
+                task_calendar.add_event(
+                    title = st.session_state[f'task_{i+1}'],
+                    day=start.date(),
+                    start = start.time().strftime('%H:%M'),
+                    end = end.time().strftime('%H:%M'),
+                    style = EventStyles.GREEN,
+                    notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
+                )
+
     task_calendar.save('parameters/time_blocks.png')
 
     st.image('parameters/time_blocks.png')
@@ -258,6 +316,7 @@ def event_to_dict(event):
 def add_task():
     st.session_state["number_of_tasks"] = st.session_state["number_of_tasks"] + 1
 def main():
+    st.set_page_config(layout="wide")
     #upload ics file
     st.file_uploader("Upload Calendar",type=".ics",key='calendar_ics',on_change=import_calendar)
 
