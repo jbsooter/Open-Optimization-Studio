@@ -11,11 +11,12 @@ from ortools.linear_solver import pywraplp
 from utilities import timeblockingutils
 
 
-def generate_time_blocks(I,K,a_k,r_i):
+def generate_time_blocks(I,K,a_k,p_k,r_i):
     """
     I = number of tasks to complete
     K = number of periods on the planning horizon
     a_k = 1 if period available, o.w 0
+    p_k = 1 if period k is not preferred, 2 if period k is preferred
     r_i = required number of 15 min periods to complete task i
     """
     # Create the mip solver with the SCIP backend.
@@ -67,8 +68,8 @@ def generate_time_blocks(I,K,a_k,r_i):
     #maximize the number of tasks completed in a single contiguous stretch
     obj_exp = 0
     for y in y_ik:
-        for z in y:
-            obj_exp+= z
+        for k in range(0,K):
+            obj_exp+= p_k[k]*y[k]
 
     solver.Maximize(obj_exp)
     status = solver.Solve()
@@ -129,6 +130,10 @@ def model_builder():
                 avail = 1
         a_k.append(avail)
 
+
+    # list for if a period is a prefered work period, or not
+    p_k = [1]*int(num_periods)
+
     #get day of week of start of time horion
     current_day = st.session_state["begin_horizon"].weekday()
     #period in day tracker
@@ -147,6 +152,9 @@ def model_builder():
         for weekday in range(0,7):
             if (current_day == weekday) & (st.session_state[f"workday_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is False):
                 a_k[k] = 0
+            #if a day is preferred, double its value in the objective
+            if (current_day == weekday) & (st.session_state[f"preferred_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is True):
+                p_k[k] = 2
 
         #increment period within day if there are periods remaining
         if(period_in_day < 24*4):
@@ -165,7 +173,8 @@ def model_builder():
     r_i = []
     for x in range(0,st.session_state['number_of_tasks']):
         r_i.append(timeblockingutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
-    generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,r_i)
+
+    generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,p_k,r_i)
 
 def import_calendar():
     if st.session_state.calendar_ics is None:
@@ -208,7 +217,7 @@ def main():
             col1,col2 = st.columns([1,3])
             with col1:
                 st.checkbox(label=x, key=('workday_'+x))
-                st.write(' ')
+                st.checkbox(label="Preferred Day",key=('preferred_' + x))
             with col2:
                 st.select_slider(label='Working Hours',key=('hours_'+x),options=timeblockingutils.working_hours_list,value=('8 AM', '5 PM'))
 
