@@ -6,6 +6,10 @@ import icalendar
 import pandas as pd
 import recurring_ical_events
 import streamlit as st
+from calendar_view.calendar import Calendar
+from calendar_view.core.config import CalendarConfig
+from calendar_view.core.data import validate_config
+from calendar_view.core.event import EventStyle, EventStyles
 from ortools.linear_solver import pywraplp
 
 from utilities import timeblockingutils
@@ -90,6 +94,43 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                 #st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15))))
     st.write(status)
     st.write(solver.Objective().Value())
+
+    #Calendar view test
+    #TODO Support calendar view output for same event non contigious assigned periods
+    config = CalendarConfig(
+        lang='en',
+        title='Task Schedule',
+        dates=st.session_state['begin_horizon'].isoformat() + ' - '+st.session_state['end_horizon'].isoformat(),
+        hours='8 - 22',
+        show_date=True,
+        legend=False,
+        title_vertical_align='top',
+
+
+    )
+    task_calendar = Calendar.build(config)
+    for i in range(0,len(x_ik)):
+        pd_start_list = []
+        for k in range(0,K):
+            if x_ik[i][k].SolutionValue() >0:
+
+                dateTimeObj = (datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15))
+                pd_start_list.append(dateTimeObj)
+
+                #st.write(dateTimeObj.time().strftime('%H:%M'))
+        start = min(pd_start_list)
+        end = max(pd_start_list) + timedelta(minutes=15)
+        task_calendar.add_event(
+            title = st.session_state[f'task_{i+1}'],
+            day=start.date(),
+            start = start.time().strftime('%H:%M'),
+            end = end.time().strftime('%H:%M'),
+            style = EventStyles.RED
+        )
+    task_calendar.save('parameters/time_blocks.png')
+
+    st.image('parameters/time_blocks.png')
+
 
 def model_builder():
     #retrieve calendar dataframe from session state

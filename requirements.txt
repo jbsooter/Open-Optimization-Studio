@@ -4,3 +4,4 @@ ortools
 xlsxwriter
 openpyxl
 recurring-ical-events
+calendar-view
