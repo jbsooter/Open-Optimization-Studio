@@ -359,7 +359,7 @@ def main():
         with col3:
             st.date_input(label="Due EOD",value=st.session_state["end_horizon"],key=f"task_{x+1}_due")
 
-    st.button(label="+ Task", on_click=add_task)
+    st.button(label="Add Task", on_click=add_task)
     #run optimization model
     st.button("Create Time Blocks", on_click=model_builder)
 
