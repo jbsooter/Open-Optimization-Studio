@@ -7,10 +7,12 @@ import pandas as pd
 import recurring_ical_events
 import streamlit as st
 from calendar_view.calendar import Calendar
+from calendar_view.config.style import image_font
 from calendar_view.core.config import CalendarConfig
 from calendar_view.core.data import validate_config
 from calendar_view.core.event import EventStyle, EventStyles
 from ortools.linear_solver import pywraplp
+from calendar_view.config import style
 
 from utilities import timeblockingutils
 
@@ -90,6 +92,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     for i in range(0,len(x_ik)):
         for k in range(0,K):
             if x_ik[i][k].SolutionValue() > 0:
+                st.write(str(k-1) + " " + str(a_k[k-1]))
                 st.write(st.session_state[f"task_{i+1}"] + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
                 #st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15))))
     st.write(status)
@@ -113,6 +116,13 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
         elif end_time_info[1] == 'PM':
             end_list.append(int(end_time_info[0]) + 12)
 
+    #style of calendar (overrides)
+    style.hour_height = 120
+    style.event_notes_color = 'black'
+    style.event_title_margin = 0
+    style.event_title_font = image_font(25)
+
+
     config = CalendarConfig(
         lang='en',
         title='Task Schedule',
@@ -122,7 +132,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
         hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1),
         show_date=True,
         legend=False,
-        title_vertical_align='top',
+       title_vertical_align='top',
     )
     task_calendar = Calendar.build(config)
     for i in range(0,len(x_ik)):
@@ -136,7 +146,6 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                 #st.write(dateTimeObj.time().strftime('%H:%M'))
 
         #Support discontinous work periods
-
         #track start index of latest work period
         start_index = 0
         #iterate all start dates for current task
@@ -144,14 +153,14 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
 
             #split blocks if indicated by greater than 15 min diff in start time
             if(pd_start_list[j] - pd_start_list[j-1] > timedelta(minutes=15)):
-                start = min(pd_start_list[start_index:j-1])
-                end = max(pd_start_list[start_index:j-1]) + timedelta(minutes=15)
-
+                start = min(pd_start_list[start_index:j])
+                end = max(pd_start_list[start_index:j]) + timedelta(minutes=15)
+                st.write(end.time().strftime('%H:%M %Z'))
                 task_calendar.add_event(
                     title = st.session_state[f'task_{i+1}'],
                     day=start.date(),
-                    start = start.time().strftime('%H:%M'),
-                    end = end.time().strftime('%H:%M'),
+                    start = start.time().strftime('%H:%M%Z'),
+                    end = end.time().strftime('%H:%M%Z'),
                     style = EventStyles.GREEN,
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                     )
@@ -166,8 +175,8 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                 task_calendar.add_event(
                     title = st.session_state[f'task_{i+1}'],
                     day=start.date(),
-                    start = start.time().strftime('%H:%M'),
-                    end = end.time().strftime('%H:%M'),
+                    start = start.time().strftime('%H:%M%Z'),
+                    end = end.time().strftime('%H:%M%Z'),
                     style = EventStyles.GREEN,
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
@@ -175,12 +184,12 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
             if (j == len(pd_start_list)-1) &( start_index == 0):
                 start = pd_start_list[0]
                 end = pd_start_list[-1] + timedelta(minutes=15)
-
+                st.write(end.time().strftime('%H:%M %Z'))
                 task_calendar.add_event(
                     title = st.session_state[f'task_{i+1}'],
                     day=start.date(),
-                    start = start.time().strftime('%H:%M'),
-                    end = end.time().strftime('%H:%M'),
+                    start = start.time().strftime('%H:%M%Z'),
+                    end = end.time().strftime('%H:%M%Z'),
                     style = EventStyles.GREEN,
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
@@ -220,7 +229,7 @@ def model_builder():
 
     #calculate number of 15 minute periods on planning horizon
     horizon_length_days = st.session_state["end_horizon"] - st.session_state["begin_horizon"]
-    horizon_length_mins = horizon_length_days.days*24*60
+    horizon_length_mins = (horizon_length_days.days+1)*24*60
     num_periods = horizon_length_mins/15
 
     #build list for period availability, making period unavailable if alread unoccupied by calendar event
@@ -247,15 +256,20 @@ def model_builder():
     #forall periods on horizon
     for k in range(0,int(num_periods)):
         #none before working hours
+        #if period_in_day < timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4:
         if period_in_day < timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4:
-            a_k[k] =0
+           #st.write( timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4)
+           a_k[k] =0
 
         #none after working hours
         if period_in_day >= timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1])*4:
+            #st.write(period_in_day)
+            #st.write( timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1])*4)
             a_k[k]  = 0
 
         #if day is not a workday then make it unavailable
         for weekday in range(0,7):
+            #st.write(weekday)
             if (current_day == weekday) & (st.session_state[f"workday_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is False):
                 a_k[k] = 0
             #if a day is preferred, double its value in the objective
@@ -324,28 +338,32 @@ def main():
     st.date_input("Start",value=datetime.today(),key="begin_horizon")
     st.date_input("End",value=datetime.today() + timedelta(days=7), key="end_horizon")
 
-    work_time_expander = st.expander(label="Change Working Days/Hours")
+    work_time_expander = st.expander(label="Change Working Days/Hours",expanded=True)
 
     with work_time_expander:
         #create work day and time insertion
         for x in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']:
             col1,col2 = st.columns([1,3])
             with col1:
-                st.checkbox(label=x, key=('workday_'+x))
+                if x in ['Saturday','Sunday']:
+                    st.checkbox(label=x, key=('workday_'+x),value=False)
+                else:
+                    st.checkbox(label=x, key=('workday_'+x),value=True)
+
                 st.checkbox(label="Preferred Day",key=('preferred_' + x))
             with col2:
                 st.select_slider(label='Working Hours',key=('hours_'+x),options=timeblockingutils.working_hours_list,value=('8 AM', '5 PM'))
 
     #create task insertion
     if 'number_of_tasks' not in st.session_state:
-        st.session_state['number_of_tasks'] = 3
+        st.session_state['number_of_tasks'] = 1
 
     for x in range(0,st.session_state['number_of_tasks']):
         col1,col2,col3 = st.columns([1,1,1])
         with col1:
             st.text_input(label='Task Name',value=f"Task {x+1}",key=f"task_{x+1}")
         with col2:
-            st.selectbox(label='Task Length',options=timeblockingutils.time_increments_list,key=f"task_{x+1}_time")
+            st.selectbox(label='Task Length',options=timeblockingutils.time_increments_list,key=f"task_{x+1}_time",index=3)
         with col3:
             st.date_input(label="Due EOD",value=st.session_state["end_horizon"],key=f"task_{x+1}_due")
 
