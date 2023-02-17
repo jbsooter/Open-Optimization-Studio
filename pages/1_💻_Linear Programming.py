@@ -69,6 +69,8 @@ def solve_mip():
             all_vars.append(solver.IntVar(0,infinity,colnames[col_ind]))
         elif str(x) == 'c':
             all_vars.append(solver.NumVar(0,infinity,colnames[col_ind]))
+        elif str(x) == 'b':
+            all_vars.append(solver.IntVar(0,1,colnames[col_ind]))
         col_ind += 1
 
     #create constraints

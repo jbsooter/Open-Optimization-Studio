@@ -89,17 +89,16 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
 
     tz = st.session_state["calendar_df"]["begin"][0].tzinfo
     #print solution and solver status to screen
-    for i in range(0,len(x_ik)):
-        for k in range(0,K):
-            if x_ik[i][k].SolutionValue() > 0:
-                st.write(str(k-1) + " " + str(a_k[k-1]))
-                st.write(st.session_state[f"task_{i+1}"] + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
-                #st.write(str(i) + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k)*15))))
+    #for i in range(0,len(x_ik)):
+    #    for k in range(0,K):
+    #        if x_ik[i][k].SolutionValue() > 0:
+    #            st.write(str(k-1) + " " + str(a_k[k-1]))
+    #            st.write(st.session_state[f"task_{i+1}"] + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
+
     st.write(status)
     st.write(solver.Objective().Value())
 
     #Calendar view test
-    #TODO Support calendar view output for same event non contigious assigned periods
     #set calendar frame of reference
     begin_list = []
     end_list = []
@@ -119,16 +118,13 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     #style of calendar (overrides)
     style.hour_height = 120
     style.event_notes_color = 'black'
-    style.event_title_margin = 0
-    style.event_title_font = image_font(25)
-
+    style.event_title_margin = 5
+    style.event_title_font = image_font(35)
 
     config = CalendarConfig(
         lang='en',
         title='Task Schedule',
         dates=st.session_state['begin_horizon'].isoformat() + ' - '+st.session_state['end_horizon'].isoformat(),
-        #TODO fix hours to match min max
-        #hours='8 - 22',
         hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1),
         show_date=True,
         legend=False,
@@ -150,12 +146,11 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
         start_index = 0
         #iterate all start dates for current task
         for j in range(0,len(pd_start_list)):
-
             #split blocks if indicated by greater than 15 min diff in start time
             if(pd_start_list[j] - pd_start_list[j-1] > timedelta(minutes=15)):
                 start = min(pd_start_list[start_index:j])
                 end = max(pd_start_list[start_index:j]) + timedelta(minutes=15)
-                st.write(end.time().strftime('%H:%M %Z'))
+
                 task_calendar.add_event(
                     title = st.session_state[f'task_{i+1}'],
                     day=start.date(),
@@ -184,7 +179,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
             if (j == len(pd_start_list)-1) &( start_index == 0):
                 start = pd_start_list[0]
                 end = pd_start_list[-1] + timedelta(minutes=15)
-                st.write(end.time().strftime('%H:%M %Z'))
+
                 task_calendar.add_event(
                     title = st.session_state[f'task_{i+1}'],
                     day=start.date(),
@@ -194,9 +189,8 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
 
-    task_calendar.save('parameters/time_blocks.png')
-
-    st.image('parameters/time_blocks.png')
+    task_calendar.save('images/time_blocks.png')
+    st.image('images/time_blocks.png')
 
 
 def model_builder():
@@ -229,7 +223,7 @@ def model_builder():
 
     #calculate number of 15 minute periods on planning horizon
     horizon_length_days = st.session_state["end_horizon"] - st.session_state["begin_horizon"]
-    horizon_length_mins = (horizon_length_days.days+1)*24*60
+    horizon_length_mins = (horizon_length_days.days+1)*24*60 #inclusive of start end days
     num_periods = horizon_length_mins/15
 
     #build list for period availability, making period unavailable if alread unoccupied by calendar event
@@ -301,7 +295,6 @@ def model_builder():
         #assumed to be EOD
         d_i.append(trunc(((st.session_state[f'task_{x+1}_due'] - st.session_state['begin_horizon']).total_seconds()/60)/15) + 24*4)
 
-    st.write(d_i)
     generate_time_blocks(st.session_state['number_of_tasks'],int(num_periods),a_k,p_k,r_i,d_i)
 
 def import_calendar():
