@@ -9,8 +9,7 @@ import streamlit as st
 from calendar_view.calendar import Calendar
 from calendar_view.config.style import image_font
 from calendar_view.core.config import CalendarConfig
-from calendar_view.core.data import validate_config
-from calendar_view.core.event import EventStyle, EventStyles
+from calendar_view.core.event import EventStyles
 from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
