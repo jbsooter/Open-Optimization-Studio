@@ -218,16 +218,19 @@ def main():
 
     #graphical representation of 2-var
     #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
-    # 2 var example
+
+    #if the problem instance is 2-var
     if len(st.session_state["df_mip"].columns) -2 == 2:
         df = st.session_state["df_mip"]
         fig, ax = plt.subplots()
 
+        #store constraint x and y intercepts for later figure scaling
         x_intercepts = []
         y_intercepts = []
-        for i in range(1,len(df)):
-            st.write("iter")
 
+        #for every row in df that represents a constraint
+        for i in range(1,len(df)):
+            #try to produce x and y intercepts of constraints at equality
             try:
                 ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
                               [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
@@ -239,22 +242,27 @@ def main():
                     ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
                 elif df[df.columns[-2]][i] == ">=":
                     ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
-                    ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none') #TODO solve overlap. p[0] references most recently used color
+                    ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none')
 
                 x_intercepts.append(ci_var1[0])
                 y_intercepts.append(ci_var2[1])
-            #vertical line constraint
+            #vertical/horizontal line constraint catch
             except ZeroDivisionError:
+                #if a vertical line constraint
                 if float(df[df.columns[0]][i]) == 0:
                     p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100)
+
+                    #TODO support > and < with dotted constraint line
                     if df[df.columns[-2]][i] == ">=":
                         ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
                     elif df[df.columns[-2]][i] == "<=":
                         ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
                     x_intercepts.append(float(df[df.columns[-1]][i]))
 
+                #if horizontal line constraint
                 elif float(df[df.columns[1]][i]) == 0:
                     p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100)
+                    #TODO support > and < with dotted constraint line
                     if df[df.columns[-2]][i] == ">=":
                         ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
                     elif df[df.columns[-2]][i] == "<=":
@@ -266,13 +274,16 @@ def main():
         #contour slope
         slope_contour = -float(df_obj[df_obj.columns[1]][0])/float(df_obj[df_obj.columns[2]][0])
 
-        length_gradient = float(df[df.columns[-1]][2])/float(df[df.columns[1]][2])*0.7 #TODO: this is a decent est, needs to be revisited
+        #scale the gradient to avg of x and y max
+        length_gradient = (max(x_intercepts) + max(y_intercepts) )/3#TODO: this is a decent est, needs to be revisited
 
         #add gradient
+        #if statements correct for direction of improvement
         if df_obj["obj"][0] == 'max':
             plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7)
         elif df_obj["obj"][0] == 'min':
             plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7)
+
         #contour lines with y intercept at x intercept of constraints
         for intercept in x_intercepts:
             x = [0,-intercept/slope_contour]
@@ -282,6 +293,7 @@ def main():
         #set axis
         plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
 
+        #render fig in streamlit
         st.pyplot(fig)
 
 
