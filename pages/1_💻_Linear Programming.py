@@ -4,6 +4,7 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
+from numpy import NaN
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
@@ -215,8 +216,7 @@ def main():
     st.button(label="Solve",on_click=solve_mip)
 
 
-    #graphical representation
-    # plot
+    #graphical representation of 2-var
     #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
     # 2 var example
     if len(st.session_state["df_mip"].columns) -2 == 2:
@@ -224,22 +224,42 @@ def main():
         fig, ax = plt.subplots()
 
         x_intercepts = []
+        y_intercepts = []
         for i in range(1,len(df)):
             st.write("iter")
-            ci_var1,ci_var2 = [np.divide(float(df[df.columns[-1]][i]),float(df[df.columns[0]][i])),0], \
-                              [0,np.divide(float(df[df.columns[-1]][i]),float(df[df.columns[1]][i]))]
-            ax.plot(ci_var1,ci_var2,marker='o')
-            ax.fill_between(ci_var1,ci_var2,alpha=0.5)
-            x_intercepts.append(ci_var1[0])
-        #c1_var1,c1_var2 = [float(df[df.columns[-1]][1])/float(df[df.columns[0]][1]),0],\
-        #                  [0,float(df[df.columns[-1]][1])/float(df[df.columns[1]][1])]
-        #c2_var1,c2_var2 = [float(df[df.columns[-1]][2])/float(df[df.columns[0]][2]),0], \
-         #                 [0,float(df[df.columns[-1]][2])/float(df[df.columns[1]][2])]
-        #ax.plot(c1_var1,c1_var2,c2_var1,c2_var2,marker='o')
 
-        #shade feasible region on per constraint basis
-        #ax.fill_between(c1_var1,c1_var2,alpha=0.5) #alpha controls transparency
-        #ax.fill_between(c2_var1,c2_var2,alpha=0.5)
+            try:
+                ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
+                              [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
+                p = ax.plot(ci_var1,ci_var2,marker='o')
+
+
+                #handle constraint shading #TODO < and > constraints
+                if df[df.columns[-2]][i] == "<=":
+                    ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
+                elif df[df.columns[-2]][i] == ">=":
+                    ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
+                    ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none') #TODO solve overlap. p[0] references most recently used color
+
+                x_intercepts.append(ci_var1[0])
+                y_intercepts.append(ci_var2[1])
+            #vertical line constraint
+            except ZeroDivisionError:
+                if float(df[df.columns[0]][i]) == 0:
+                    p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100)
+                    if df[df.columns[-2]][i] == ">=":
+                        ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                    elif df[df.columns[-2]][i] == "<=":
+                        ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                    x_intercepts.append(float(df[df.columns[-1]][i]))
+
+                elif float(df[df.columns[1]][i]) == 0:
+                    p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100)
+                    if df[df.columns[-2]][i] == ">=":
+                        ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                    elif df[df.columns[-2]][i] == "<=":
+                        ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                    y_intercepts.append(float(df[df.columns[-1]][i]))
 
         #add gradient
         df_obj = st.session_state["df_obj"]
@@ -259,6 +279,8 @@ def main():
             y = [x_val*slope_contour + intercept for x_val in x]
             ax.plot(x,y,dashes=(6,2),color="green")
 
+        #set axis
+        plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
 
         st.pyplot(fig)
 
