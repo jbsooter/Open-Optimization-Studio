@@ -1,6 +1,9 @@
 import io
+
+import numpy as np
 import streamlit as st
 import pandas as pd
+from matplotlib import pyplot as plt
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
@@ -187,9 +190,9 @@ def main():
     st.title("Linear Programming")
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=","<="],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c',2.0, 1.0, 1.0]), 'var2': pd.Series(['c',1.0, 1.0, 0.0]),'inequality':["","<=","<=","<="],'RHS':pd.Series(['',100.0,80.0,40.0])})
     if 'df_obj' not in st.session_state:
-        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([1.0],dtype='double'), 'var2':pd.Series([45.0],dtype='double')})
+        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
 
     col1,col2 = st.columns([6,1])
     with col1:
@@ -210,6 +213,57 @@ def main():
         st.button(label="\+ Variable",on_click=add_column)
 
     st.button(label="Solve",on_click=solve_mip)
+
+
+    #graphical representation
+    # plot
+    #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
+    # 2 var example
+    if len(st.session_state["df_mip"].columns) -2 == 2:
+        df = st.session_state["df_mip"]
+        fig, ax = plt.subplots()
+
+        x_intercepts = []
+        for i in range(1,len(df)):
+            st.write("iter")
+            ci_var1,ci_var2 = [np.divide(float(df[df.columns[-1]][i]),float(df[df.columns[0]][i])),0], \
+                              [0,np.divide(float(df[df.columns[-1]][i]),float(df[df.columns[1]][i]))]
+            ax.plot(ci_var1,ci_var2,marker='o')
+            ax.fill_between(ci_var1,ci_var2,alpha=0.5)
+            x_intercepts.append(ci_var1[0])
+        #c1_var1,c1_var2 = [float(df[df.columns[-1]][1])/float(df[df.columns[0]][1]),0],\
+        #                  [0,float(df[df.columns[-1]][1])/float(df[df.columns[1]][1])]
+        #c2_var1,c2_var2 = [float(df[df.columns[-1]][2])/float(df[df.columns[0]][2]),0], \
+         #                 [0,float(df[df.columns[-1]][2])/float(df[df.columns[1]][2])]
+        #ax.plot(c1_var1,c1_var2,c2_var1,c2_var2,marker='o')
+
+        #shade feasible region on per constraint basis
+        #ax.fill_between(c1_var1,c1_var2,alpha=0.5) #alpha controls transparency
+        #ax.fill_between(c2_var1,c2_var2,alpha=0.5)
+
+        #add gradient
+        df_obj = st.session_state["df_obj"]
+        #contour slope
+        slope_contour = -float(df_obj[df_obj.columns[1]][0])/float(df_obj[df_obj.columns[2]][0])
+
+        length_gradient = float(df[df.columns[-1]][2])/float(df[df.columns[1]][2])*0.7 #TODO: this is a decent est, needs to be revisited
+
+        #add gradient
+        if df_obj["obj"][0] == 'max':
+            plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7)
+        elif df_obj["obj"][0] == 'min':
+            plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7)
+        #contour lines with y intercept at x intercept of constraints
+        for intercept in x_intercepts:
+            x = [0,-intercept/slope_contour]
+            y = [x_val*slope_contour + intercept for x_val in x]
+            ax.plot(x,y,dashes=(6,2),color="green")
+
+
+        st.pyplot(fig)
+
+
+
 
     if 'last_solution' in st.session_state:
         st.write(st.session_state['solution_message'])
