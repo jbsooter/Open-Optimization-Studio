@@ -11,24 +11,26 @@ def add_employee_line(col1,col2,col3):
     with col3:
         st.multiselect(label="On Days", options=st.session_state.business_days)
 def main():
-    st.write("UI layout only. No backend. ")
+    st.write("Coming Soon!")
 
-    col1, col2,col3 = st.columns([1,3,1])
-    with col1:
-        st.text_input(label="Business Name")
-    with col2:
-        time_list = [f'{x} AM' for x in range(1,12)]
-        time_list.extend(["12 PM"])
-        time_list.extend([f'{x} PM' for x in range(1,12)])
-        time_list.extend(["12 AM"])
-        st.select_slider(label= "Open Hours", options=time_list, value=['1 AM', '12 AM'], key='business_hours')
-    with col3:
-        st.multiselect(label="On Days", options=["Mon","Tues","Wed","Thurs","Fri","Sat","Sun"], key ="business_days")
+    #st.write("UI layout only. No backend. ")
 
-    st.header("Employee Availability")
+    #col1, col2,col3 = st.columns([1,3,1])
+    #with col1:
+    #    st.text_input(label="Business Name")
+    #with col2:
+    #    time_list = [f'{x} AM' for x in range(1,12)]
+    #    time_list.extend(["12 PM"])
+    #    time_list.extend([f'{x} PM' for x in range(1,12)])
+    #    time_list.extend(["12 AM"])
+    #    st.select_slider(label= "Open Hours", options=time_list, value=['1 AM', '12 AM'], key='business_hours')
+    #with col3:
+    #    st.multiselect(label="On Days", options=["Mon","Tues","Wed","Thurs","Fri","Sat","Sun"], key ="business_days")
 
-    col1, col2,col3 = st.columns([1,3,1])
-    add_employee_line(col1,col2,col3)
+    #st.header("Employee Availability")
+
+    #col1, col2,col3 = st.columns([1,3,1])
+    #add_employee_line(col1,col2,col3)
 
 if __name__ == "__main__":
     main()
