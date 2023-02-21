@@ -1,25 +1,29 @@
 import io
+
 import streamlit as st
 import pandas as pd
+from matplotlib import pyplot as plt
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df,editable=True)
     builder.configure_column("obj", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["min","max"]})
+    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65, enable_enterprise_modules=False)
+    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False,height=65, enable_enterprise_modules=False)
 
 def load_constraints_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df, editable=True)
     builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=="]})
+    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
+    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
 
 def add_row():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
@@ -86,15 +90,12 @@ def solve_mip():
                 i = i+1
 
             #add constraint with appropriate inequality and rhs to model
-            if(row["inequality"] == ">="):
+            if row["inequality"] == ">=":
                 solver.Add(constraint_expression>= float(row["RHS"]))
             elif row["inequality"] == "<=":
                 solver.Add(constraint_expression <= float(row["RHS"]))
-            elif row["inequality"] == ">":
-                solver.Add(constraint_expression > float(row["RHS"]))
-            elif row["inequality"] == "<":
-                solver.Add(constraint_expression <  float(row["RHS"]))
-
+            elif row["inequality"] == "==":
+                solver.Add(constraint_expression == float(row["RHS"]))
     #create objective expression
     for index, row in st.session_state.df_obj.iterrows():
         if index < (len(row)-2):
@@ -181,15 +182,101 @@ def upload_mip():
     #reset project data
     st.session_state.df_mip = df_mip
     st.session_state.df_obj = df_obj
+
+def two_var_graphical_solution():
+    #graphical representation of 2-var
+    #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
+
+    #if the problem instance is 2-var
+    if len(st.session_state["df_mip"].columns) -2 == 2:
+        df = st.session_state["df_mip"]
+
+        #if continuous vars
+        if (df[df.columns[0]][0] == 'c') & (df[df.columns[1]][0] == 'c'):
+            fig, ax = plt.subplots()
+
+            #store constraint x and y intercepts for later figure scaling
+            x_intercepts = []
+            y_intercepts = []
+
+            #for every row in df that represents a constraint
+            for i in range(1,len(df)):
+                #try to produce x and y intercepts of constraints at equality
+                try:
+                    ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
+                                      [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
+                    p = ax.plot(ci_var1,ci_var2,marker='o')
+
+
+                    #handle constraint shading #TODO < and > constraints
+                    if df[df.columns[-2]][i] == "<=":
+                        ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
+                    elif df[df.columns[-2]][i] == ">=":
+                        ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
+                        ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none')
+
+                    x_intercepts.append(ci_var1[0])
+                    y_intercepts.append(ci_var2[1])
+                #vertical/horizontal line constraint catch
+                except ZeroDivisionError:
+                    #if a vertical line constraint
+                    if float(df[df.columns[1]][i]) == 0:
+                        p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100,color=next(ax._get_lines.prop_cycler)['color'])
+
+                        if df[df.columns[-2]][i] == ">=":
+                            ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                        elif df[df.columns[-2]][i] == "<=":
+                            ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        x_intercepts.append(float(df[df.columns[-1]][i]))
+
+                    #if horizontal line constraint
+                    elif float(df[df.columns[0]][i]) == 0:
+                        p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100,color=next(ax._get_lines.prop_cycler)['color'])
+                        #TODO support > and < with dotted constraint line
+                        if df[df.columns[-2]][i] == ">=":
+                            ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                        elif df[df.columns[-2]][i] == "<=":
+                            ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        y_intercepts.append(float(df[df.columns[-1]][i]))
+
+            #add gradient
+            df_obj = st.session_state["df_obj"]
+            #contour slope
+            slope_contour = -float(df_obj[df_obj.columns[1]][0])/float(df_obj[df_obj.columns[2]][0])
+
+            #scale the gradient to avg of x and y max
+            length_gradient = (max(x_intercepts) + max(y_intercepts) )/3#TODO: this is a decent est, needs to be revisited
+
+            #add gradient
+            #if statements correct for direction of improvement
+            if df_obj["obj"][0] == 'max':
+                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
+            elif df_obj["obj"][0] == 'min':
+                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
+
+            #contour lines with y intercept at x intercept of constraints
+            for intercept in x_intercepts:
+                x = [0,-intercept/slope_contour]
+                y = [x_val*slope_contour + intercept for x_val in x]
+                ax.plot(x,y,dashes=(6,2),color="green")
+
+            #set axis
+            plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
+
+            #return figure for continous, 2-var example
+            return fig
+        else:
+            #return no figure
+            return None
 def main():
     st.set_page_config(layout="wide")
 
     st.title("Linear Programming")
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['i',10.0, 2.0, 3.0]), 'var2': pd.Series(['c',4.0, 5.0, 6.0]),'inequality':["",">=","<=","<="],'RHS':pd.Series(['',13.0,1000.0,1000.0])})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c',2.0, 1.0, 1.0]), 'var2': pd.Series(['c',1.0, 1.0, 0.0]),'inequality':["","<=","<=","<="],'RHS':pd.Series(['',100.0,80.0,40.0])})
     if 'df_obj' not in st.session_state:
-        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([1.0],dtype='double'), 'var2':pd.Series([45.0],dtype='double')})
+        st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
 
     col1,col2 = st.columns([6,1])
     with col1:
@@ -199,7 +286,7 @@ def main():
         load_constraints_grid(st.session_state.df_mip)
 
         #allow for additional constraints
-        st.button(label="\+ Constraint",on_click=add_row)
+        st.button(label="Add Constraint",on_click=add_row)
 
     with col2:
         #adding white space. TODO: More elegant solution?
@@ -207,7 +294,7 @@ def main():
             st.write("")
 
         #allow for additional variables
-        st.button(label="\+ Variable",on_click=add_column)
+        st.button(label="Add Variable",on_click=add_column)
 
     st.button(label="Solve",on_click=solve_mip)
 
@@ -216,10 +303,18 @@ def main():
         st.write(st.session_state['last_solution'])
         st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
 
+    #determine if a graphical solution can be generated
+    figure = two_var_graphical_solution()
+
+    #if a graphical solution generated, display it
+    if figure is not None:
+        st.pyplot(figure)
+
     #allow for File I/O
     with st.sidebar:
-        st.download_button(data=download_mip(), label="Download Model",file_name="model.xlsx" )
-        st.file_uploader(label="Upload Model",type='.xlsx',key="model_up",on_change=upload_mip)
+        st.header("Model Input/Output")
+        st.file_uploader(label="Upload an Excel Model",type='.xlsx',key="model_up",on_change=upload_mip)
+        st.download_button(data=download_mip(), label="Download Current Model",file_name="model.xlsx" )
 
 if __name__ == "__main__":
     main()
