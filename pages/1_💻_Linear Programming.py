@@ -1,30 +1,29 @@
 import io
 
-import numpy as np
 import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
-from numpy import NaN
-from pandas import Series
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df,editable=True)
     builder.configure_column("obj", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["min","max"]})
+    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True,height=65, enable_enterprise_modules=False)
+    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False,height=65, enable_enterprise_modules=False)
 
 def load_constraints_grid(df):
     #builds a gridOptions dictionary using a GridOptionsBuilder instance.
     builder = GridOptionsBuilder.from_dataframe(df, editable=True)
     builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=="]})
+    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
     go = builder.build()
 
     #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=True, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
+    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
 
 def add_row():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
