@@ -98,7 +98,8 @@ def solve_mip():
                 solver.Add(constraint_expression > float(row["RHS"]))
             elif row["inequality"] == "<":
                 solver.Add(constraint_expression <  float(row["RHS"]))
-
+            elif row["inequality"] == "==":
+                solver.Add(constraint_expression == float(row["RHS"]))
     #create objective expression
     for index, row in st.session_state.df_obj.iterrows():
         if index < (len(row)-2):
