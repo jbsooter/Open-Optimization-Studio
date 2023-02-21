@@ -291,7 +291,7 @@ def main():
         load_constraints_grid(st.session_state.df_mip)
 
         #allow for additional constraints
-        st.button(label="\+ Constraint",on_click=add_row)
+        st.button(label="Add Constraint",on_click=add_row)
 
     with col2:
         #adding white space. TODO: More elegant solution?
@@ -299,7 +299,7 @@ def main():
             st.write("")
 
         #allow for additional variables
-        st.button(label="\+ Variable",on_click=add_column)
+        st.button(label="Add Variable",on_click=add_column)
 
     st.button(label="Solve",on_click=solve_mip)
 
@@ -308,15 +308,18 @@ def main():
         st.write(st.session_state['last_solution'])
         st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
 
+    #determine if a graphical solution can be generated
     figure = two_var_graphical_solution()
 
+    #if a graphical solution generated, display it
     if figure is not None:
         st.pyplot(figure)
 
     #allow for File I/O
     with st.sidebar:
-        st.download_button(data=download_mip(), label="Download Model",file_name="model.xlsx" )
-        st.file_uploader(label="Upload Model",type='.xlsx',key="model_up",on_change=upload_mip)
+        st.header("Model Input/Output")
+        st.file_uploader(label="Upload an Excel Model",type='.xlsx',key="model_up",on_change=upload_mip)
+        st.download_button(data=download_mip(), label="Download Current Model",file_name="model.xlsx" )
 
 if __name__ == "__main__":
     main()

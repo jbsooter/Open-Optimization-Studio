@@ -5,7 +5,7 @@ def main():
         page_icon="🌐"
     )
     st.title("🌐 Open Optimization Studio")
-    st.subheader("Accessible, Scalable, Visual, Browser-based Optimization for the Cloud Era")
+    st.subheader("Web-Based Optimization Powered by Google OR-Tools")
     st.write(
         """
         
