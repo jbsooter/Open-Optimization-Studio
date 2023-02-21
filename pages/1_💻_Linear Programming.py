@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
 from numpy import NaN
+from pandas import Series
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
 def load_obj_grid(df):
@@ -186,6 +187,93 @@ def upload_mip():
     #reset project data
     st.session_state.df_mip = df_mip
     st.session_state.df_obj = df_obj
+
+def two_var_graphical_solution():
+    #graphical representation of 2-var
+    #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
+
+    #if the problem instance is 2-var
+    if len(st.session_state["df_mip"].columns) -2 == 2:
+        df = st.session_state["df_mip"]
+
+        #if continuous vars
+        if (df[df.columns[0]][0] == 'c') & (df[df.columns[1]][0] == 'c'):
+            fig, ax = plt.subplots()
+
+            #store constraint x and y intercepts for later figure scaling
+            x_intercepts = []
+            y_intercepts = []
+
+            #for every row in df that represents a constraint
+            for i in range(1,len(df)):
+                #try to produce x and y intercepts of constraints at equality
+                try:
+                    ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
+                                      [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
+                    p = ax.plot(ci_var1,ci_var2,marker='o')
+
+
+                    #handle constraint shading #TODO < and > constraints
+                    if df[df.columns[-2]][i] == "<=":
+                        ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
+                    elif df[df.columns[-2]][i] == ">=":
+                        ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
+                        ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none')
+
+                    x_intercepts.append(ci_var1[0])
+                    y_intercepts.append(ci_var2[1])
+                #vertical/horizontal line constraint catch
+                except ZeroDivisionError:
+                    #if a vertical line constraint
+                    if float(df[df.columns[0]][i]) == 0:
+                        p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100)
+
+                        #TODO support > and < with dotted constraint line
+                        if df[df.columns[-2]][i] == ">=":
+                            ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                        elif df[df.columns[-2]][i] == "<=":
+                            ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        x_intercepts.append(float(df[df.columns[-1]][i]))
+
+                    #if horizontal line constraint
+                    elif float(df[df.columns[1]][i]) == 0:
+                        p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100)
+                        #TODO support > and < with dotted constraint line
+                        if df[df.columns[-2]][i] == ">=":
+                            ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
+                        elif df[df.columns[-2]][i] == "<=":
+                            ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        y_intercepts.append(float(df[df.columns[-1]][i]))
+
+            #add gradient
+            df_obj = st.session_state["df_obj"]
+            #contour slope
+            slope_contour = -float(df_obj[df_obj.columns[1]][0])/float(df_obj[df_obj.columns[2]][0])
+
+            #scale the gradient to avg of x and y max
+            length_gradient = (max(x_intercepts) + max(y_intercepts) )/3#TODO: this is a decent est, needs to be revisited
+
+            #add gradient
+            #if statements correct for direction of improvement
+            if df_obj["obj"][0] == 'max':
+                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7)
+            elif df_obj["obj"][0] == 'min':
+                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7)
+
+            #contour lines with y intercept at x intercept of constraints
+            for intercept in x_intercepts:
+                x = [0,-intercept/slope_contour]
+                y = [x_val*slope_contour + intercept for x_val in x]
+                ax.plot(x,y,dashes=(6,2),color="green")
+
+            #set axis
+            plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
+
+            #return figure for continous, 2-var example
+            return fig
+        else:
+            #return no figure
+            return None
 def main():
     st.set_page_config(layout="wide")
 
@@ -216,94 +304,15 @@ def main():
 
     st.button(label="Solve",on_click=solve_mip)
 
-
-    #graphical representation of 2-var
-    #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
-
-    #if the problem instance is 2-var
-    if len(st.session_state["df_mip"].columns) -2 == 2:
-        df = st.session_state["df_mip"]
-        fig, ax = plt.subplots()
-
-        #store constraint x and y intercepts for later figure scaling
-        x_intercepts = []
-        y_intercepts = []
-
-        #for every row in df that represents a constraint
-        for i in range(1,len(df)):
-            #try to produce x and y intercepts of constraints at equality
-            try:
-                ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
-                              [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
-                p = ax.plot(ci_var1,ci_var2,marker='o')
-
-
-                #handle constraint shading #TODO < and > constraints
-                if df[df.columns[-2]][i] == "<=":
-                    ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
-                elif df[df.columns[-2]][i] == ">=":
-                    ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
-                    ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none')
-
-                x_intercepts.append(ci_var1[0])
-                y_intercepts.append(ci_var2[1])
-            #vertical/horizontal line constraint catch
-            except ZeroDivisionError:
-                #if a vertical line constraint
-                if float(df[df.columns[0]][i]) == 0:
-                    p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100)
-
-                    #TODO support > and < with dotted constraint line
-                    if df[df.columns[-2]][i] == ">=":
-                        ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
-                    elif df[df.columns[-2]][i] == "<=":
-                        ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
-                    x_intercepts.append(float(df[df.columns[-1]][i]))
-
-                #if horizontal line constraint
-                elif float(df[df.columns[1]][i]) == 0:
-                    p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100)
-                    #TODO support > and < with dotted constraint line
-                    if df[df.columns[-2]][i] == ">=":
-                        ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
-                    elif df[df.columns[-2]][i] == "<=":
-                        ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
-                    y_intercepts.append(float(df[df.columns[-1]][i]))
-
-        #add gradient
-        df_obj = st.session_state["df_obj"]
-        #contour slope
-        slope_contour = -float(df_obj[df_obj.columns[1]][0])/float(df_obj[df_obj.columns[2]][0])
-
-        #scale the gradient to avg of x and y max
-        length_gradient = (max(x_intercepts) + max(y_intercepts) )/3#TODO: this is a decent est, needs to be revisited
-
-        #add gradient
-        #if statements correct for direction of improvement
-        if df_obj["obj"][0] == 'max':
-            plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7)
-        elif df_obj["obj"][0] == 'min':
-            plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7)
-
-        #contour lines with y intercept at x intercept of constraints
-        for intercept in x_intercepts:
-            x = [0,-intercept/slope_contour]
-            y = [x_val*slope_contour + intercept for x_val in x]
-            ax.plot(x,y,dashes=(6,2),color="green")
-
-        #set axis
-        plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
-
-        #render fig in streamlit
-        st.pyplot(fig)
-
-
-
-
     if 'last_solution' in st.session_state:
         st.write(st.session_state['solution_message'])
         st.write(st.session_state['last_solution'])
         st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
+
+    figure = two_var_graphical_solution()
+
+    if figure is not None:
+        st.pyplot(figure)
 
     #allow for File I/O
     with st.sidebar:
