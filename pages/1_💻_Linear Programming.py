@@ -223,7 +223,6 @@ def two_var_graphical_solution():
                     if float(df[df.columns[1]][i]) == 0:
                         p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100,color=next(ax._get_lines.prop_cycler)['color'])
 
-                        #TODO support > and < with dotted constraint line
                         if df[df.columns[-2]][i] == ">=":
                             ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
                         elif df[df.columns[-2]][i] == "<=":
@@ -251,9 +250,9 @@ def two_var_graphical_solution():
             #add gradient
             #if statements correct for direction of improvement
             if df_obj["obj"][0] == 'max':
-                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7)
+                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
             elif df_obj["obj"][0] == 'min':
-                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7)
+                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
 
             #contour lines with y intercept at x intercept of constraints
             for intercept in x_intercepts:
