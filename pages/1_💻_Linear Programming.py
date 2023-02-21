@@ -90,14 +90,10 @@ def solve_mip():
                 i = i+1
 
             #add constraint with appropriate inequality and rhs to model
-            if(row["inequality"] == ">="):
+            if row["inequality"] == ">=":
                 solver.Add(constraint_expression>= float(row["RHS"]))
             elif row["inequality"] == "<=":
                 solver.Add(constraint_expression <= float(row["RHS"]))
-            elif row["inequality"] == ">":
-                solver.Add(constraint_expression > float(row["RHS"]))
-            elif row["inequality"] == "<":
-                solver.Add(constraint_expression <  float(row["RHS"]))
             elif row["inequality"] == "==":
                 solver.Add(constraint_expression == float(row["RHS"]))
     #create objective expression
