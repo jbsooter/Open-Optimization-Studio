@@ -225,7 +225,7 @@ def two_var_graphical_solution():
                 except ZeroDivisionError:
                     #if a vertical line constraint
                     if float(df[df.columns[0]][i]) == 0:
-                        p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100)
+                        p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100,color=next(ax._get_lines.prop_cycler)['color'])
 
                         #TODO support > and < with dotted constraint line
                         if df[df.columns[-2]][i] == ">=":
@@ -236,7 +236,7 @@ def two_var_graphical_solution():
 
                     #if horizontal line constraint
                     elif float(df[df.columns[1]][i]) == 0:
-                        p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100)
+                        p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100,color=next(ax._get_lines.prop_cycler)['color'])
                         #TODO support > and < with dotted constraint line
                         if df[df.columns[-2]][i] == ">=":
                             ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
