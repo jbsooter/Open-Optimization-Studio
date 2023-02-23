@@ -184,11 +184,19 @@ def upload_mip():
     st.session_state.df_obj = df_obj
 
 def two_var_graphical_solution():
+    #set color scheme
+    color_defaults = {
+        'infeasible':'lightgrey',
+        'feasible': 'green',
+        'contour': 'red',
+        'gradient':'blue'
+    }
+
     #graphical representation of 2-var
     #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
 
     #if the problem instance is 2-var
-    if len(st.session_state["df_mip"].columns) -2 == 2:
+    if len(st.session_state["df_mip"].columns) - 2 == 2:
         df = st.session_state["df_mip"]
 
         #if continuous vars
@@ -205,15 +213,13 @@ def two_var_graphical_solution():
                 try:
                     ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
                                       [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
-                    p = ax.plot(ci_var1,ci_var2,marker='o')
 
-
-                    #handle constraint shading #TODO < and > constraints
-                    if df[df.columns[-2]][i] == "<=":
-                        ax.fill_between(ci_var1,ci_var2,alpha=0.5,color=p[0].get_color())
-                    elif df[df.columns[-2]][i] == ">=":
-                        ax.fill_between(ci_var1,ci_var2,1000,alpha=0.5,color=p[0].get_color(),ec='none')
-                        ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,alpha=0.5,color=p[0].get_color(),ec='none')
+                    #handle constraint shading, inequalities are flipped because we are shading the infeasible region (easier)
+                    if df[df.columns[-2]][i] == ">=":
+                        ax.fill_between(ci_var1,ci_var2,color=color_defaults['infeasible'])
+                    elif df[df.columns[-2]][i] == "<=":
+                        ax.fill_between(ci_var1,ci_var2,1000,color= color_defaults['infeasible'],ec='none')
+                        ax.fill_betweenx([0,1000],ci_var1[0]-0.00567,10000,color= color_defaults['infeasible'],ec='none')
 
                     x_intercepts.append(ci_var1[0])
                     y_intercepts.append(ci_var2[1])
@@ -221,22 +227,18 @@ def two_var_graphical_solution():
                 except ZeroDivisionError:
                     #if a vertical line constraint
                     if float(df[df.columns[1]][i]) == 0:
-                        p = ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100,color=next(ax._get_lines.prop_cycler)['color'])
-
-                        if df[df.columns[-2]][i] == ">=":
-                            ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
-                        elif df[df.columns[-2]][i] == "<=":
-                            ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        if df[df.columns[-2]][i] == "<=":
+                            ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,color= color_defaults['infeasible'])
+                        elif df[df.columns[-2]][i] == ">=":
+                            ax.fill_betweenx([0,1000],0,float(df[df.columns[-1]][i]),color= color_defaults['infeasible'])
                         x_intercepts.append(float(df[df.columns[-1]][i]))
 
                     #if horizontal line constraint
                     elif float(df[df.columns[0]][i]) == 0:
-                        p = ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100,color=next(ax._get_lines.prop_cycler)['color'])
-                        #TODO support > and < with dotted constraint line
-                        if df[df.columns[-2]][i] == ">=":
-                            ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,alpha=0.5,color=p.get_color())
-                        elif df[df.columns[-2]][i] == "<=":
-                            ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),alpha=0.5,color=p.get_color())
+                        if df[df.columns[-2]][i] == "<=":
+                            ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,color= color_defaults['infeasible'])
+                        elif df[df.columns[-2]][i] == ">=":
+                            ax.fill_between([0,1000],0,float(df[df.columns[-1]][i]),color= color_defaults['infeasible'])
                         y_intercepts.append(float(df[df.columns[-1]][i]))
 
             #add gradient
@@ -250,9 +252,9 @@ def two_var_graphical_solution():
             #add gradient
             #if statements correct for direction of improvement
             if df_obj["obj"][0] == 'max':
-                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
+                plt.arrow(0,0,length_gradient,length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True,color=color_defaults['gradient'])
             elif df_obj["obj"][0] == 'min':
-                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True)
+                plt.arrow(length_gradient,length_gradient*(-1.0/slope_contour),-length_gradient,-length_gradient*(-1.0/slope_contour),width=0.7,length_includes_head=True,color=color_defaults['gradient'])
 
             #contour lines with y intercept at x intercept of constraints
             for intercept in x_intercepts:
@@ -263,6 +265,8 @@ def two_var_graphical_solution():
             #set axis
             plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
 
+            #set background
+            ax.set_facecolor(color_defaults['feasible'])
             #return figure for continous, 2-var example
             return fig
         else:
