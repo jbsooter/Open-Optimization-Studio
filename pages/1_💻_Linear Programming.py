@@ -55,8 +55,18 @@ def solve_mip():
     st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
     st.session_state['df_obj'] = st.session_state['aggrid_obj']['data']
 
-    # Create the mip solver with the SCIP backend.
-    solver = pywraplp.Solver.CreateSolver('SCIP')
+    solver_backend = None
+    # choose solver based on context
+    for x in st.session_state.df_mip.iloc[0]:
+        #if integer or binary var ever observed, CP-SAT
+        if (x == 'b') | (x == 'i'):
+            solver_backend = "CP_SAT"
+
+    #if no integer or binary observed, GLOP
+    if solver_backend == None:
+        solver_backend = 'GLOP'
+
+    solver = pywraplp.Solver.CreateSolver(solver_backend)
     if not solver:
         return
     infinity = solver.infinity()
@@ -199,8 +209,9 @@ def two_var_graphical_solution():
     if len(st.session_state["df_mip"].columns) - 2 == 2:
         df = st.session_state["df_mip"]
 
-        #if continuous vars
-        if (df[df.columns[0]][0] == 'c') & (df[df.columns[1]][0] == 'c'):
+        #if continuous vars and no == constraints contained in formulation
+        #TODO: Support for == constraints
+        if (df[df.columns[0]][0] == 'c') & (df[df.columns[1]][0] == 'c') & ~('==' in df[df.columns[-2]].tolist()) :
             fig, ax = plt.subplots()
 
             #store constraint x and y intercepts for later figure scaling
