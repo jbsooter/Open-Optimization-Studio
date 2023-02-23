@@ -186,9 +186,9 @@ def upload_mip():
 def two_var_graphical_solution():
     #set color scheme
     color_defaults = {
-        'infeasible':'lightgrey',
-        'feasible': 'green',
-        'contour': 'red',
+        'infeasible':'white',
+        'feasible': 'lightgreen',
+        'contour': 'darkgreen',
         'gradient':'blue'
     }
 
@@ -213,6 +213,7 @@ def two_var_graphical_solution():
                 try:
                     ci_var1,ci_var2 = [float(df[df.columns[-1]][i])/float(df[df.columns[0]][i]),0], \
                                       [0,float(df[df.columns[-1]][i])/float(df[df.columns[1]][i])]
+                    ax.plot(ci_var1,ci_var2,marker='o')
 
                     #handle constraint shading, inequalities are flipped because we are shading the infeasible region (easier)
                     if df[df.columns[-2]][i] == ">=":
@@ -227,6 +228,8 @@ def two_var_graphical_solution():
                 except ZeroDivisionError:
                     #if a vertical line constraint
                     if float(df[df.columns[1]][i]) == 0:
+                        ax.axvline(x=float(df[df.columns[-1]][i]),ymin=0,ymax=100,color=next(ax._get_lines.prop_cycler)['color'])
+
                         if df[df.columns[-2]][i] == "<=":
                             ax.fill_betweenx([0,1000],float(df[df.columns[-1]][i]),1000,color= color_defaults['infeasible'])
                         elif df[df.columns[-2]][i] == ">=":
@@ -235,6 +238,8 @@ def two_var_graphical_solution():
 
                     #if horizontal line constraint
                     elif float(df[df.columns[0]][i]) == 0:
+                        ax.axhline(y=float(df[df.columns[-1]][i]),xmin=0,xmax=100,color=next(ax._get_lines.prop_cycler)['color'])
+
                         if df[df.columns[-2]][i] == "<=":
                             ax.fill_between([0,1000],float(df[df.columns[-1]][i]),1000,color= color_defaults['infeasible'])
                         elif df[df.columns[-2]][i] == ">=":
@@ -260,7 +265,7 @@ def two_var_graphical_solution():
             for intercept in x_intercepts:
                 x = [0,-intercept/slope_contour]
                 y = [x_val*slope_contour + intercept for x_val in x]
-                ax.plot(x,y,dashes=(6,2),color="green")
+                ax.plot(x,y,dashes=(6,2),color=color_defaults['contour'])
 
             #set axis
             plt.axis([0,max(x_intercepts),0,max(y_intercepts)])
