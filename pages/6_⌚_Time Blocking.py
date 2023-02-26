@@ -26,7 +26,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     d_i = period that task i is due
     """
     # Create the mip solver with the SCIP backend.
-    solver = pywraplp.Solver.CreateSolver('SCIP')
+    solver = pywraplp.Solver.CreateSolver('CP-SAT')
 
     x_ik = [] #is task i worked on during period k?
     for i in range(0,I):
