@@ -100,9 +100,9 @@ def solve_mip():
         elif status == solver.INFEASIBLE:
             st.session_state['solution_message'] += "The model is infeasible. "
             st.session_state['last_solution'] = pd.DataFrame()
-        elif status == solver.UNKNOWN:
-            st.session_state['solution_message'] += "The model is status UNKNOWN. "
-            st.session_state['last_solution'] = pd.DataFrame()
+        #elif status == solver.UNKNOWN:
+        #    st.session_state['solution_message'] += "The model is status UNKNOWN. "
+        #    st.session_state['last_solution'] = pd.DataFrame()
         elif status == solver.MODEL_INVALID:
             st.session_state['solution_message'] += "The model formulation did not pass the validation step. "
             st.session_state['last_solution'] = pd.DataFrame()
