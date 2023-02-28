@@ -3,43 +3,9 @@ import io
 import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from ortools.linear_solver import pywraplp
-def load_obj_grid(df):
-    #builds a gridOptions dictionary using a GridOptionsBuilder instance.
-    builder = GridOptionsBuilder.from_dataframe(df,editable=True)
-    builder.configure_column("obj", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["min","max"]})
-    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
-    go = builder.build()
-
-    #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_obj'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False,height=65, enable_enterprise_modules=False)
-
-def load_constraints_grid(df):
-    #builds a gridOptions dictionary using a GridOptionsBuilder instance.
-    builder = GridOptionsBuilder.from_dataframe(df, editable=True)
-    builder.configure_column("inequality", editable=True, cellEditor='agSelectCellEditor',cellEditorParams={'values':["<=",">=","=="]})
-    builder.configure_default_column(sortable=False,min_column_width=4,filterable=False,editable=True)
-    go = builder.build()
-
-    #uses the gridOptions dictionary to configure AgGrid behavior and loads AgGrid
-    st.session_state['aggrid_mip'] = AgGrid(df, gridOptions=go,editable=True,fit_columns_on_grid_load=False, enable_enterprise_modules=False,reload_data=False,update_mode=GridUpdateMode.GRID_CHANGED)
-
-def add_row():
-    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
-    #get existing
-    old_df = st.session_state['df_mip']
-
-    #create dataframe representing new row
-    new_row = pd.DataFrame()
-    for col in old_df.columns:
-        new_row[col] = [0]
-
-    #create and save new, combined dataframe
-    st.session_state['df_mip'] = pd.concat([old_df, new_row])
 
 def add_column():
-    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
     #get old data
     old_df = st.session_state['df_mip']
 
@@ -48,12 +14,12 @@ def add_column():
     ncols = len(old_df.columns)
 
     #create new row with auto variable name
-    st.session_state['df_mip'].insert(ncols-2,f"var{ncols-1}",[0]*nrows)
+    st.session_state['df_mip'].insert(ncols-2,f"var{ncols-1}",['0']*nrows)
     st.session_state['df_obj'][f"var{ncols-1}"] = [0]
 
 def solve_mip():
-    st.session_state['df_mip'] = st.session_state['aggrid_mip']['data']
-    st.session_state['df_obj'] = st.session_state['aggrid_obj']['data']
+    st.session_state['df_mip'] = st.session_state['input_mip']
+    st.session_state['df_obj'] = st.session_state['input_obj']
 
     solver_backend = None
     # choose solver based on context
@@ -127,12 +93,18 @@ def solve_mip():
 
     #report results and save message to session state
     if status != solver.OPTIMAL:
-        st.session_state.solution_message = "No optimal solution found!"
+        st.session_state.solution_message = "No optimal solution found! "
         if status == solver.FEASIBLE:
-            st.session_state['solution_message'] += "A potentially suboptimal solution was found"
+            st.session_state['solution_message'] += "A potentially suboptimal solution was found. "
             solution_printer(solver=solver)
-        else:
-            st.session_state['solution_message'] += "The solver could not solve the problem. "
+        elif status == solver.INFEASIBLE:
+            st.session_state['solution_message'] += "The model is infeasible. "
+            st.session_state['last_solution'] = pd.DataFrame()
+        elif status == solver.UNKNOWN:
+            st.session_state['solution_message'] += "The model is status UNKNOWN. "
+            st.session_state['last_solution'] = pd.DataFrame()
+        elif status == solver.MODEL_INVALID:
+            st.session_state['solution_message'] += "The model formulation did not pass the validation step. "
             st.session_state['last_solution'] = pd.DataFrame()
     elif status == solver.OPTIMAL:
         st.session_state['solution_message'] = f"An optimal solution was found in {solver.wall_time()/1000.0} s."
@@ -294,19 +266,17 @@ def main():
     st.title("Linear Programming")
     #initialize session default data
     if 'df_mip' not in st.session_state:
-        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c',2.0, 1.0, 1.0]), 'var2': pd.Series(['c',1.0, 1.0, 0.0]),'inequality':["","<=","<=","<="],'RHS':pd.Series(['',100.0,80.0,40.0])})
+        st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c',2.0, 1.0, 1.0],dtype='string'), 'var2': pd.Series(['c',1.0, 1.0, 0.0],dtype='string'),'inequality':["","<=","<=","<="],'RHS':pd.Series(['',100.0,80.0,40.0])})
+        st.session_state['input_mip'] = pd.DataFrame();
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
-
+        st.session_state['input_obj'] = pd.DataFrame()
     col1,col2 = st.columns([6,1])
     with col1:
-        #load obj grid
-        load_obj_grid(st.session_state.df_obj)
-        #load input grid
-        load_constraints_grid(st.session_state.df_mip)
-
-        #allow for additional constraints
-        st.button(label="Add Constraint",on_click=add_row)
+        #load obj grid, save input
+        st.session_state['input_obj'] = st.experimental_data_editor(st.session_state["df_obj"],num_rows="dynamic")
+        #load input grid, save input
+        st.session_state['input_mip'] = st.experimental_data_editor(st.session_state["df_mip"],num_rows="dynamic")
 
     with col2:
         #adding white space. TODO: More elegant solution?
