@@ -18,6 +18,7 @@ def add_column():
     st.session_state['df_obj'][f"var{ncols-1}"] = [0]
 
 def solve_mip():
+    #grab any modifications from data input
     st.session_state['df_mip'] = st.session_state['input_mip']
     st.session_state['df_obj'] = st.session_state['input_obj']
 
@@ -67,11 +68,11 @@ def solve_mip():
 
             #add constraint with appropriate inequality and rhs to model
             if row["inequality"] == ">=":
-                solver.Add(constraint_expression>= float(row["RHS"]))
+                solver.Add(constraint_expression>= float(row["RHS"]),name=f"c{index}")
             elif row["inequality"] == "<=":
-                solver.Add(constraint_expression <= float(row["RHS"]))
+                solver.Add(constraint_expression <= float(row["RHS"]),name=f"c{index}")
             elif row["inequality"] == "==":
-                solver.Add(constraint_expression == float(row["RHS"]))
+                solver.Add(constraint_expression == float(row["RHS"]),name=f"c{index}")
     #create objective expression
     for index, row in st.session_state.df_obj.iterrows():
         if index < (len(row)-2):
@@ -113,6 +114,7 @@ def solve_mip():
 def solution_printer(solver):
     #GLOP only
     #st.write(solver.constraints()[2].DualValue())
+
     #dataframe to hold solution
     df_sol = pd.DataFrame()
     df_sol["obj"] = pd.Series(solver.Objective().Value())
@@ -120,6 +122,20 @@ def solution_printer(solver):
         if (x.name() != "inequality") & (x.name() != "RHS"):
             df_sol[x.name()] = pd.Series(x.SolutionValue())
     st.session_state['last_solution'] = df_sol
+
+    activities = solver.ComputeConstraintActivities()
+    o = [{'Name':c.name(), 'Shadow Price':c.dual_value(), 'Slack': c.ub() - activities[i]} for i, c in enumerate(solver.constraints())]
+    st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
+
+    #output format
+    #modfile = solver.ExportModelAsLpFormat(obfuscated=False)
+    #st.write(modfile)
+    #m = modfile.split("Obj:")
+    #m = m[1].split(":")
+
+    #for x in m:
+    #    st.write(x)
+
 def download_mip():
     #in memory location for excel file
     buffer = io.BytesIO()
@@ -139,6 +155,7 @@ def download_sol():
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
         st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
+        st.session_state.sensitivity_analysis.to_excel(writer,sheet_name="sensitivity",index=False,engine='xlsxwriter')
         return buffer
 def upload_mip():
     #get file from uploader
@@ -267,7 +284,7 @@ def main():
     #initialize session default data
     if 'df_mip' not in st.session_state:
         st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c',2.0, 1.0, 1.0],dtype='string'), 'var2': pd.Series(['c',1.0, 1.0, 0.0],dtype='string'),'inequality':["","<=","<=","<="],'RHS':pd.Series(['',100.0,80.0,40.0])})
-        st.session_state['input_mip'] = pd.DataFrame();
+        st.session_state['input_mip'] = pd.DataFrame()
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
         st.session_state['input_obj'] = pd.DataFrame()
@@ -291,6 +308,9 @@ def main():
     if 'last_solution' in st.session_state:
         st.write(st.session_state['solution_message'])
         st.write(st.session_state['last_solution'])
+    if 'sensitivity_analysis' in st.session_state:
+        st.write(st.session_state['sensitivity_analysis'])
+    if 'last_solution' in st.session_state:
         st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
 
     #determine if a graphical solution can be generated
