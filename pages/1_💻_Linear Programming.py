@@ -22,18 +22,20 @@ def solve_mip():
     st.session_state['df_mip'] = st.session_state['input_mip']
     st.session_state['df_obj'] = st.session_state['input_obj']
 
-    solver_backend = None
+    st.session_state.solver_backend = None
     # choose solver based on context
     for x in st.session_state.df_mip.iloc[0]:
         #if integer or binary var ever observed, CP-SAT
         if (x == 'b') | (x == 'i'):
-            solver_backend = "CP_SAT"
+            st.session_state.solver_backend = "CP_SAT"
 
     #if no integer or binary observed, GLOP
-    if solver_backend == None:
-        solver_backend = 'GLOP'
+    if st.session_state.solver_backend == None:
+        st.session_state.solver_backend = 'GLOP'
 
-    solver = pywraplp.Solver.CreateSolver(solver_backend)
+    solver = pywraplp.Solver.CreateSolver(st.session_state.solver_backend)
+    solver.SetTimeLimit(st.session_state['time_limit']*1000) #convert to ms
+
     if not solver:
         return
     infinity = solver.infinity()
@@ -112,9 +114,6 @@ def solve_mip():
         solution_printer(solver=solver)
 
 def solution_printer(solver):
-    #GLOP only
-    #st.write(solver.constraints()[2].DualValue())
-
     #dataframe to hold solution
     df_sol = pd.DataFrame()
     df_sol["obj"] = pd.Series(solver.Objective().Value())
@@ -126,15 +125,6 @@ def solution_printer(solver):
     activities = solver.ComputeConstraintActivities()
     o = [{'Name':c.name(), 'Shadow Price':c.dual_value(), 'Slack': c.ub() - activities[i]} for i, c in enumerate(solver.constraints())]
     st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
-
-    #output format
-    #modfile = solver.ExportModelAsLpFormat(obfuscated=False)
-    #st.write(modfile)
-    #m = modfile.split("Obj:")
-    #m = m[1].split(":")
-
-    #for x in m:
-    #    st.write(x)
 
 def download_mip():
     #in memory location for excel file
@@ -155,7 +145,16 @@ def download_sol():
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
         st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
-        st.session_state.sensitivity_analysis.to_excel(writer,sheet_name="sensitivity",index=False,engine='xlsxwriter')
+        if st.session_state.solver_backend == 'GLOP':
+            st.session_state.sensitivity_analysis.to_excel(writer,sheet_name="sensitivity",index=False,engine='xlsxwriter')
+
+            #if a 2-var continous problem, save graphical solution to worksheet
+            if two_var_graphical_solution() is not None:
+                pd.DataFrame().to_excel(writer, sheet_name="graphical",index=False,engine='xlsxwriter')
+                two_var_graphical_solution()
+                plt.savefig("images/graphical.png")
+                #writer.Workbook.add_worksheet('graphical')
+                writer.sheets['graphical'].insert_image('A1',"images/graphical.png")
         return buffer
 def upload_mip():
     #get file from uploader
@@ -288,12 +287,27 @@ def main():
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
         st.session_state['input_obj'] = pd.DataFrame()
+
+    #setup sidebar
+    #allow for File I/O
+    with st.sidebar:
+        st.header("Model Input/Output")
+        st.file_uploader(label="Upload an Excel Model",type='.xlsx',key="model_up",on_change=upload_mip,help="Import xlsx file containing model formulation")
+        st.download_button(data=download_mip(), label="Download Current Model",file_name="model.xlsx",help="Downloads formulation in xlsx format" )
+        if 'last_solution' in st.session_state:
+            st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx",help="Downloads formulation, solution, and sensitivity report in xlsx format")
+        st.header("Settings")
+        st.checkbox("Do not render model",help="Improves performance for large models by hiding the editable dataframe. ",key="hide_model")
+        st.checkbox("Do not render solution",help="Improves performance for large solutions by hiding output dataframe",key="hide_solution")
+        st.number_input("Time Limit (s)",value=60, key="time_limit")
+    #main page
     col1,col2 = st.columns([6,1])
     with col1:
-        #load obj grid, save input
-        st.session_state['input_obj'] = st.experimental_data_editor(st.session_state["df_obj"],num_rows="dynamic")
-        #load input grid, save input
-        st.session_state['input_mip'] = st.experimental_data_editor(st.session_state["df_mip"],num_rows="dynamic")
+        if st.session_state["hide_model"] is False:
+            #load obj grid, save input
+            st.session_state['input_obj'] = st.experimental_data_editor(st.session_state["df_obj"],num_rows="dynamic")
+            #load input grid, save input
+            st.session_state['input_mip'] = st.experimental_data_editor(st.session_state["df_mip"],num_rows="dynamic")
 
     with col2:
         #adding white space. TODO: More elegant solution?
@@ -301,30 +315,29 @@ def main():
             st.write("")
 
         #allow for additional variables
-        st.button(label="Add Variable",on_click=add_column)
+        st.button(label="Add Variable",on_click=add_column,help="Creates a new variable column")
 
-    st.button(label="Solve",on_click=solve_mip)
+    st.button(label="Solve",on_click=solve_mip,help="Solves the model")
 
-    if 'last_solution' in st.session_state:
-        st.write(st.session_state['solution_message'])
-        st.write(st.session_state['last_solution'])
-    if 'sensitivity_analysis' in st.session_state:
-        st.write(st.session_state['sensitivity_analysis'])
-    if 'last_solution' in st.session_state:
-        st.download_button(data=download_sol(), label="Download Model + Solution",file_name="model-solution.xlsx")
+    if st.session_state['hide_solution'] is False:
+        if 'last_solution' in st.session_state:
+            st.write(st.session_state['solution_message'])
+            st.write(st.session_state['last_solution'])
+        if st.session_state['solver_backend'] is 'GLOP':
+            if 'sensitivity_analysis' in st.session_state:
+                st.write("The sensitivity of the constraint set is as follows: ")
+                st.write(st.session_state['sensitivity_analysis'])
 
     #determine if a graphical solution can be generated
     figure = two_var_graphical_solution()
 
-    #if a graphical solution generated, display it
-    if figure is not None:
-        st.pyplot(figure)
+    if st.session_state['hide_solution'] is False:
+        #if a graphical solution generated, display it
+        if figure is not None:
+            st.write("Graphical Representation")
+            col1,col2 = st.columns([3,2])
+            col1.pyplot(figure)
 
-    #allow for File I/O
-    with st.sidebar:
-        st.header("Model Input/Output")
-        st.file_uploader(label="Upload an Excel Model",type='.xlsx',key="model_up",on_change=upload_mip)
-        st.download_button(data=download_mip(), label="Download Current Model",file_name="model.xlsx" )
 
 if __name__ == "__main__":
     main()
