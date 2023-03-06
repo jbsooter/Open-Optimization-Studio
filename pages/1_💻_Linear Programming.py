@@ -287,7 +287,8 @@ def main():
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj":"max",'var1': pd.Series([3.0],dtype='double'), 'var2':pd.Series([2.0],dtype='double')})
         st.session_state['input_obj'] = pd.DataFrame()
-
+    if 'solver_backend' not in st.session_state:
+        st.session_state.solver_backend = None
     #setup sidebar
     #allow for File I/O
     with st.sidebar:
