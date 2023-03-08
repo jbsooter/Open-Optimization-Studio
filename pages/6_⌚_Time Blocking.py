@@ -26,7 +26,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     d_i = period that task i is due
     """
     # Create the mip solver with the SCIP backend.
-    solver = pywraplp.Solver.CreateSolver('SCIP')
+    solver = pywraplp.Solver.CreateSolver('CP-SAT')
 
     x_ik = [] #is task i worked on during period k?
     for i in range(0,I):
@@ -188,6 +188,22 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
 
+            #remove events that are not within the timeframe
+            cal_df = st.session_state["calendar_df"]
+            cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz)]
+            cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=tz)]
+
+            #add calendar events to time block png
+            for index, row in cal_df.iterrows():
+                task_calendar.add_event(
+                    title = row["name"],
+                    day=row["begin"].date(),
+                    start = row["begin"].time().strftime('%H:%M%Z'),
+                    end = row["end"].time().strftime('%H:%M%Z'),
+                    style = EventStyles.GREEN,
+                    notes=row["begin"].time().strftime('%I:%M %p %Z') + ' - ' + row["end"].time().strftime('%I:%M %p %Z')
+                )
+
     task_calendar.save('images/time_blocks.png')
     st.image('images/time_blocks.png')
 
@@ -303,8 +319,8 @@ def import_calendar():
 
     #read in ics file, convert to dataframe using event to dict and list comprehension
     cal = icalendar.Calendar.from_ical(StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
-    #TODO: Evaluate options for import DATERANGE
-    events = recurring_ical_events.of(cal).between(datetime.today()-timedelta(days=1),datetime.today() + timedelta(days=14))
+    #Date range is the forward looking year
+    events = recurring_ical_events.of(cal).between(datetime.today()-timedelta(days=1),datetime.today() + timedelta(days=365))
     events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
