@@ -200,7 +200,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     day=row["begin"].date(),
                     start = row["begin"].time().strftime('%H:%M%Z'),
                     end = row["end"].time().strftime('%H:%M%Z'),
-                    style = EventStyles.GREEN,
+                    style = EventStyles.BLUE,
                     notes=row["begin"].time().strftime('%I:%M %p %Z') + ' - ' + row["end"].time().strftime('%I:%M %p %Z')
                 )
 
