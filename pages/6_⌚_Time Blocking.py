@@ -124,7 +124,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
         lang='en',
         title='Task Schedule',
         dates=st.session_state['begin_horizon'].isoformat() + ' - '+st.session_state['end_horizon'].isoformat(),
-        hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1),
+        hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1), #based on tasks alone, not events for calendar range
         show_date=True,
         legend=False,
        title_vertical_align='top',
@@ -137,8 +137,6 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
 
                 dateTimeObj = (datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15))
                 pd_start_list.append(dateTimeObj)
-
-                #st.write(dateTimeObj.time().strftime('%H:%M'))
 
         #Support discontinous work periods
         #track start index of latest work period
@@ -188,21 +186,21 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
 
-            #remove events that are not within the timeframe
-            cal_df = st.session_state["calendar_df"]
-            cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz)]
-            cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=tz)]
+        #remove events that are not within the timeframe
+        cal_df = st.session_state["calendar_df"]
+        cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz)]
+        cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,month=st.session_state["end_horizon"].month,year=st.session_state["end_horizon"].year,tzinfo=tz)]
 
-            #add calendar events to time block png
-            for index, row in cal_df.iterrows():
-                task_calendar.add_event(
-                    title = row["name"],
-                    day=row["begin"].date(),
-                    start = row["begin"].time().strftime('%H:%M%Z'),
-                    end = row["end"].time().strftime('%H:%M%Z'),
-                    style = EventStyles.BLUE,
-                    notes=row["begin"].time().strftime('%I:%M %p %Z') + ' - ' + row["end"].time().strftime('%I:%M %p %Z')
-                )
+        #add calendar events to time block png
+        for index, row in cal_df.iterrows():
+            task_calendar.add_event(
+                title = row["name"],
+                day=row["begin"].date(),
+                start = row["begin"].time().strftime('%H:%M%Z'),
+                end = row["end"].time().strftime('%H:%M%Z'),
+                style = EventStyles.BLUE,
+                notes=row["begin"].time().strftime('%I:%M %p %Z') + ' - ' + row["end"].time().strftime('%I:%M %p %Z')
+            )
 
     task_calendar.save('images/time_blocks.png')
     st.image('images/time_blocks.png')
