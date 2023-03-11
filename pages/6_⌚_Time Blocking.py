@@ -14,6 +14,7 @@ from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
 from utilities import timeblockingutils
+from utilities import config
 
 
 def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
@@ -111,16 +112,16 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     style.event_title_margin = 5
     style.event_title_font = image_font(35)
 
-    config = CalendarConfig(
-        lang='en',
-        title='Task Schedule',
+    config_loc = CalendarConfig(
+        lang=config.calendar_opts['lang'],
+        title=config.calendar_opts['title'],
         dates=st.session_state['begin_horizon'].isoformat() + ' - '+st.session_state['end_horizon'].isoformat(),
         hours = str(min(begin_list)-1) + " - " + str(max(end_list)+1), #based on tasks alone, not events for calendar range
-        show_date=True,
-        legend=False,
-       title_vertical_align='top',
+        show_date=config.calendar_opts['show_date'],
+        legend=config.calendar_opts['legend'],
+       title_vertical_align=config.calendar_opts['title_vertical_align'],
     )
-    task_calendar = Calendar.build(config)
+    task_calendar = Calendar.build(config_loc)
     for i in range(0,len(x_ik)):
         pd_start_list = []
         for k in range(0,K):
@@ -143,7 +144,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     day=start.date(),
                     start = start.time().strftime('%H:%M%Z'),
                     end = end.time().strftime('%H:%M%Z'),
-                    style = EventStyles.GREEN,
+                    style = config.calendar_event_opts['task_display_color'],
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                     )
                 #set start index for next round to be after this block
@@ -159,7 +160,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     day=start.date(),
                     start = start.time().strftime('%H:%M%Z'),
                     end = end.time().strftime('%H:%M%Z'),
-                    style = EventStyles.GREEN,
+                    style = config.calendar_event_opts['task_display_color'],
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
             #if j is last elements index and there has been no prior block
@@ -172,7 +173,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                     day=start.date(),
                     start = start.time().strftime('%H:%M%Z'),
                     end = end.time().strftime('%H:%M%Z'),
-                    style = EventStyles.GREEN,
+                    style = config.calendar_event_opts['task_display_color'],
                     notes=start.time().strftime('%I:%M %p %Z') + ' - ' + end.time().strftime('%I:%M %p %Z')
                 )
 
@@ -188,7 +189,7 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
                 day=row["begin"].date(),
                 start = row["begin"].time().strftime('%H:%M%Z'),
                 end = row["end"].time().strftime('%H:%M%Z'),
-                style = EventStyles.BLUE,
+                style = config.calendar_event_opts['event_display_color'],
                 notes=row["begin"].time().strftime('%I:%M %p %Z') + ' - ' + row["end"].time().strftime('%I:%M %p %Z')
             )
 

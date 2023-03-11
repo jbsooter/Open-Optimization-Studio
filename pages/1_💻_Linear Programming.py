@@ -5,6 +5,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
 
+from utilities import config
+
 def add_column():
     #get old data
     old_df = st.session_state['df_mip']
@@ -27,11 +29,13 @@ def solve_mip():
     for x in st.session_state.df_mip.iloc[0]:
         #if integer or binary var ever observed, CP-SAT
         if (x == 'b') | (x == 'i'):
-            st.session_state.solver_backend = "CP_SAT"
+            st.session_state.solver_backend = config.solver_backend['mip']
+            st.session_state.lp_type = 'mip'
 
-    #if no integer or binary observed, GLOP
+    #if no integer or binary observed, use linear solver
     if st.session_state.solver_backend == None:
-        st.session_state.solver_backend = 'GLOP'
+        st.session_state.solver_backend = config.solver_backend['linear']
+        st.session_state.lp_type = 'lp'
 
     solver = pywraplp.Solver.CreateSolver(st.session_state.solver_backend)
     solver.SetTimeLimit(st.session_state['time_limit']*1000) #convert to ms
@@ -145,7 +149,7 @@ def download_sol():
         st.session_state.df_obj.to_excel(writer, sheet_name="model", index=False, engine='xlsxwriter')
         st.session_state.df_mip.to_excel(writer, sheet_name="model", index=False,startrow=4, engine='xlsxwriter')
         st.session_state.last_solution.to_excel(writer, sheet_name="solution", index=False, engine='xlsxwriter')
-        if st.session_state.solver_backend == 'GLOP':
+        if st.session_state.lp_type == 'lp':
             st.session_state.sensitivity_analysis.to_excel(writer,sheet_name="sensitivity",index=False,engine='xlsxwriter')
 
             #if a 2-var continous problem, save graphical solution to worksheet
@@ -183,12 +187,7 @@ def upload_mip():
 
 def two_var_graphical_solution():
     #set color scheme
-    color_defaults = {
-        'infeasible':'white',
-        'feasible': 'lightgreen',
-        'contour': 'darkgreen',
-        'gradient':'blue'
-    }
+    color_defaults = config.two_var_color_defaults
 
     #graphical representation of 2-var
     #https://stackoverflow.com/questions/36470343/how-to-draw-a-line-with-matplotlib#:~:text=x1%20are%20the%20x%20coordinates%20of%20the%20points,y1%2C%20x2%2C%20y2%2C%20marker%20%3D%20%27o%27%29%20plt.show%20%28%29
@@ -289,6 +288,8 @@ def main():
         st.session_state['input_obj'] = pd.DataFrame()
     if 'solver_backend' not in st.session_state:
         st.session_state.solver_backend = None
+    if 'lp_type' not in st.session_state:
+        st.session_state.lp_type = None
     #setup sidebar
     #allow for File I/O
     with st.sidebar:
@@ -324,7 +325,7 @@ def main():
         if 'last_solution' in st.session_state:
             st.write(st.session_state['solution_message'])
             st.write(st.session_state['last_solution'])
-        if st.session_state['solver_backend'] is 'GLOP':
+        if st.session_state['lp_type'] is 'lp':
             if 'sensitivity_analysis' in st.session_state:
                 st.write("The sensitivity of the constraint set is as follows: ")
                 st.write(st.session_state['sensitivity_analysis'])
