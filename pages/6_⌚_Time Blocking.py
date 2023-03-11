@@ -87,15 +87,6 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     status = solver.Solve()
 
     tz = st.session_state["calendar_df"]["begin"][0].tzinfo
-    #print solution and solver status to screen
-    #for i in range(0,len(x_ik)):
-    #    for k in range(0,K):
-    #        if x_ik[i][k].SolutionValue() > 0:
-    #            st.write(str(k-1) + " " + str(a_k[k-1]))
-    #            st.write(st.session_state[f"task_{i+1}"] + "\t \t" + str((datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15)).astimezone().strftime("%Y-%m-%dT%I:%M:%S  %p %Z")))#todo add timedelta
-
-    st.write(status)
-    st.write(solver.Objective().Value())
 
     #Calendar view test
     #set calendar frame of reference
@@ -134,7 +125,6 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
         pd_start_list = []
         for k in range(0,K):
             if x_ik[i][k].SolutionValue() >0:
-
                 dateTimeObj = (datetime(day=st.session_state["begin_horizon"].day,month=st.session_state["begin_horizon"].month,year=st.session_state["begin_horizon"].year,tzinfo=tz) + timedelta(minutes=(k-1)*15))
                 pd_start_list.append(dateTimeObj)
 
@@ -205,7 +195,6 @@ def generate_time_blocks(I,K,a_k,p_k,r_i,d_i):
     task_calendar.save('images/time_blocks.png')
     st.image('images/time_blocks.png')
 
-
 def model_builder():
     #retrieve calendar dataframe from session state
     cal_df = st.session_state["calendar_df"]
@@ -252,7 +241,6 @@ def model_builder():
                 avail = 1
         a_k.append(avail)
 
-
     # list for if a period is a prefered work period, or not
     p_k = [1]*int(num_periods)
 
@@ -263,20 +251,15 @@ def model_builder():
     #forall periods on horizon
     for k in range(0,int(num_periods)):
         #none before working hours
-        #if period_in_day < timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4:
         if period_in_day < timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4:
-           #st.write( timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0])*4)
            a_k[k] =0
 
         #none after working hours
         if period_in_day >= timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1])*4:
-            #st.write(period_in_day)
-            #st.write( timeblockingutils.working_hour_str_to_num(st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1])*4)
             a_k[k]  = 0
 
         #if day is not a workday then make it unavailable
         for weekday in range(0,7):
-            #st.write(weekday)
             if (current_day == weekday) & (st.session_state[f"workday_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is False):
                 a_k[k] = 0
             #if a day is preferred, double its value in the objective
@@ -296,7 +279,7 @@ def model_builder():
             else:
                 current_day += 1
 
-    #solve the model with sample 3 tasks, num_periods, a_k, and 1,2,3 task lengths
+    #convert time required for each task to be in terms of discrete 15 min periods
     r_i = []
     for x in range(0,st.session_state['number_of_tasks']):
         r_i.append(timeblockingutils.time_increment_to_num_periods(st.session_state[f"task_{x+1}_time"]))
@@ -376,7 +359,6 @@ def main():
     st.button(label="Add Task", on_click=add_task)
     #run optimization model
     st.button("Create Time Blocks", on_click=model_builder)
-
 
 if __name__ == "__main__":
     main()
