@@ -20,11 +20,11 @@ $$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik} \forall i \in {0,1,\dot
 
 $$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik}$$ (togetherness constraint)
 
-$$ a_k \geq x_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
+$$a_k \geq x_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
 
 $$\sum_{k=0}^K x_{ik} = r_i \forall i \in {0,1,\dots,I}$$ (Task single completion constraint)
 
 $$\sum_{i=0}^I x_{ik} \leq 1 \forall k \in {0,1,\dots,K}$$ (One task per period constraint)
 
-$$k \geq d_i x_ij, \text{then } x_{ik} = 0 \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$ (Task must be completed before due date)
+$$k \geq d_i x_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$ (Task must be completed before due date)
 
