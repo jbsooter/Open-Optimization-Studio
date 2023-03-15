@@ -18,7 +18,7 @@ $$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik} \tab \forall i \in {0,1
 
 
 
-$$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik} \tab \forall i \in {0,1,\dots,I \forall k \in {0,1,\dots,K} togetherness constraint$$ (togetherness constraint)
+$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik} \tab \forall i \in {0,1,\dots,I \forall k \in {0,1,\dots,K}$ (togetherness constraint)
 
 $$a_k \geq x_{ik} \tab \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
 
