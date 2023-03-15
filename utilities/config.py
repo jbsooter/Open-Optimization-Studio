@@ -13,6 +13,7 @@ solver_backend = dict(
 
 #Linear Programming module options
 #color options for 2-var visualization
+#options: any recognized colors from matplotlib
 two_var_color_defaults = dict(
     infeasible = 'white',
     feasible = 'lightgreen',
@@ -22,7 +23,10 @@ two_var_color_defaults = dict(
 
 #Vehicle Routing options
 vrp_opts = dict(
-
+    matrix_provider = 'Mapbox', #options [Mapbox,ORS]
+    matrix_server = 'Default', #options [Default,Local]
+    matrix_profile_opts = ['driving','walking','cycling','driving-traffic'], #pass through parameters that depend on matrix_provider
+    geocoding_provider = 'Mapbox' #currently only option, others will be implemented in future
 )
 
 #Scheduling options

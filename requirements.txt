@@ -5,3 +5,5 @@ openpyxl
 recurring-ical-events
 calendar-view
 matplotlib
+routingpy
+geopy
