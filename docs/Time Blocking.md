@@ -14,17 +14,17 @@ $d_i$ = the period that task $i$ is due
 $x_{ik} \in {0,1}$ : 1 if task $i$ is worked on during period $k$, 0 otherwise
 $y_{ik} \in {0,1}$ : 1 if task $i$ is worked on during a cohesive block starting with period $k$, 0 otherwise
 
-$$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik} \tab \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$
+$$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik}  \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$
 
 
 
-$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik} \tab \forall i \in {0,1,\dots,I \forall k \in {0,1,\dots,K}$ (togetherness constraint)
+$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik}  \forall i \in {0,1,\dots,I \forall k \in {0,1,\dots,K}$ (togetherness constraint)
 
 $$a_k \geq x_{ik} \tab \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
 
-$$\sum_{k=0}^K x_{ik} = r_i \tab \forall i \in {0,1,\dots,I}$$ (Task single completion constraint)
+$$\sum_{k=0}^K x_{ik} = r_i  \forall i \in {0,1,\dots,I}$$ (Task single completion constraint)
 
-$$\sum_{i=0}^I x_{ik} \leq 1 \tab \forall k \in {0,1,\dots,K}$$ (One task per period constraint)
+$$\sum_{i=0}^I x_{ik} \leq 1  \forall k \in {0,1,\dots,K}$$ (One task per period constraint)
 
-$$k \geq d_i x_{ik} \tab \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Task must be completed before due date)
+$$k \geq d_i x_{ik}  \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Task must be completed before due date)
 
