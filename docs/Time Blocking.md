@@ -18,9 +18,9 @@ $$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik}  \forall i \in {0,1,\do
 
 
 
-$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik}  \forall i \in {0,1,\dots,I \forall k \in {0,1,\dots,K}$ (togetherness constraint)
+$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik}  \forall i \in {0,1,\dots,I} \forall k \in {0,1,\dots,K}$ (togetherness constraint)
 
-$$a_k \geq x_{ik} \tab \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
+$$a_k \geq x_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
 
 $$\sum_{k=0}^K x_{ik} = r_i  \forall i \in {0,1,\dots,I}$$ (Task single completion constraint)
 
