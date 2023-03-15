@@ -1,5 +1,5 @@
 # Time Blocking
-$I$ is the number of tasks to complete
+$I$ = number of tasks to complete
 
 $K$ = number of periods on the planning horizon
 
@@ -14,18 +14,17 @@ $d_i$ = the period that task $i$ is due
 $x_{ik} \in {0,1}$ : 1 if task $i$ is worked on during period $k$, 0 otherwise
 $y_{ik} \in {0,1}$ : 1 if task $i$ is worked on during a cohesive block starting with period $k$, 0 otherwise
 
-$$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik} $$
+$$\text{Maximize: } \sum_{i=1}^I \sum_{k=1}^K p_k y_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$
 
-$$\forall i \in {1,2,\dots,I}, \forall k \in {1,2,\dots,K}:$$ (togetherness constraint)
 
-$$\sum_{r=0}^{r_i-1} x_{i,k+r} \geq r_i y_{ik}$$
 
-$$\forall i \in {1,2,\dots,I}, \forall k \in {1,2,\dots,K}: a_k \geq x_{ik} $$ (Time period available constraint)
+$$\sum_{k}^{k + r_i} x_{i,k} \geq r_i y_{ik}$$ (togetherness constraint)
 
-$$\forall i \in {1,2,\dots,I}: \sum_{k=1}^K x_{ik} = r_i $$ (Task single completion constraint)
+$$ a_k \geq x_{ik} \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}$$ (Time period available constraint)
 
-$$\forall k \in {1,2,\dots,K}: \sum_{i=1}^I x_{ik} \leq 1 $$ (One task per period constraint)
+$$\sum_{k=0}^K x_{ik} = r_i \forall i \in {0,1,\dots,I}$$ (Task single completion constraint)
 
-$$\forall i \in {1,2,\dots,I}, \forall k \in {1,2,\dots,K}:$$ (Task must be completed before due date)
+$$\sum_{i=0}^I x_{ik} \leq 1 \forall k \in {0,1,\dots,K}$$ (One task per period constraint)
 
-$$\text{if } k \geq d_i, \text{then } x_{ik} = 0 $$
+$$k \geq d_i x_ij, \text{then } x_{ik} = 0 \forall i \in {0,1,\dots,I}, \forall k \in {0,1,\dots,K}:$$ (Task must be completed before due date)
+
