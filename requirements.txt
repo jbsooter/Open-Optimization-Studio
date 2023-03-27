@@ -7,3 +7,5 @@ calendar-view
 matplotlib
 routingpy
 geopy
+streamlit-folium
+folium

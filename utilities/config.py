@@ -22,12 +22,40 @@ two_var_color_defaults = dict(
 )
 
 #Vehicle Routing options
+
+#types of route profiles available for each service. For details on specific implementation, see Mapbox or ORS docs
+provider_specific_profile_opts = dict(
+    Mapbox = ['driving','walking','cycling','driving-traffic'],
+    ORS = ['driving-car','foot-walking','cycling-regular']
+)
+
 vrp_opts = dict(
     matrix_provider = 'Mapbox', #options [Mapbox,ORS]
     matrix_server = 'Default', #options [Default,Local]
-    matrix_profile_opts = ['driving','walking','cycling','driving-traffic'], #pass through parameters that depend on matrix_provider
-    geocoding_provider = 'Mapbox' #currently only option, others will be implemented in future
+    matrix_profile_opts = provider_specific_profile_opts["Mapbox"], #pass through parameters that depend on matrix_provider
+    geocoding_provider = 'Mapbox', #currently only option, others will be implemented in future
+    folium_colors = [
+        'red',
+        'blue',
+        'gray',
+        'darkred',
+        'lightred',
+        'orange',
+        'beige',
+        'green',
+        'darkgreen',
+        'lightgreen',
+        'darkblue',
+        'lightblue',
+        'purple',
+        'darkpurple',
+        'pink',
+        'cadetblue',
+        'lightgray',
+        'black'
+] #colors to rotate through for tours. these are all possible
 )
+
 
 #Scheduling options
 scheduling_opts = dict(
