@@ -1,5 +1,4 @@
 import folium
-import numpy as np
 import pandas as pd
 import streamlit_folium
 import openrouteservice
@@ -14,6 +13,8 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from utilities.utility_functions import decode_polyline
 from utilities import config
 
+#ORS client to be shared among all methods
+client = openrouteservice.Client(key=st.secrets["matrix_key"])
 def query_matrix(nodes):
     '''
     Takes a list of coordinate pairs (lon,lat) and returns matrix based on configured/selected
@@ -22,7 +23,6 @@ def query_matrix(nodes):
     :return: matrix of appropriate arc costs
     '''
 
-    client = openrouteservice.Client(key=st.secrets["matrix_key"])
     matrix = distance_matrix.distance_matrix(client,locations=nodes,profile='driving-car')
     return matrix["durations"]
 def geocode_addresses(addresses):
@@ -31,7 +31,6 @@ def geocode_addresses(addresses):
     :param addresses:
     :return: list of coordinate pairs (lon,lat)
     '''
-    client = openrouteservice.Client(key=st.secrets['matrix_key'],base_url='https://api.openrouteservice.org/')
 
     coordinates = []
     for location in addresses:
@@ -148,7 +147,6 @@ def print_solution(addresses,nodes, manager, routing, solution):
         st.write(plan_output)
         max_route_distance = max(route_distance, max_route_distance)
 
-        client = openrouteservice.Client(key=st.secrets['matrix_key'],base_url='https://api.openrouteservice.org/')
         route = directions(client=client,coordinates=node_coordinates,profile="driving-car")
 
         coords = decode_polyline(route["routes"][0]["geometry"],False)
