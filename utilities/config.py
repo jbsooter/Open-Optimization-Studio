@@ -22,18 +22,10 @@ two_var_color_defaults = dict(
 )
 
 #Vehicle Routing options
-
-#types of route profiles available for each service. For details on specific implementation, see Mapbox or ORS docs
-provider_specific_profile_opts = dict(
-    Mapbox = ['driving','walking','cycling','driving-traffic'],
-    ORS = ['driving-car','foot-walking','cycling-regular']
-)
-
 vrp_opts = dict(
-    matrix_provider = 'Mapbox', #options [Mapbox,ORS]
-    matrix_server = 'Default', #options [Default,Local]
-    matrix_profile_opts = provider_specific_profile_opts["Mapbox"], #pass through parameters that depend on matrix_provider
-    geocoding_provider = 'ORS', #currently only option, others will be implemented in future
+    ors_server = 'Default', #options [Default,insert/url/here]
+    ors_matrix_profile_opts =  ['driving-car','foot-walking','cycling-regular'],
+    max_num_nodes = 8,
     folium_colors = [
         'red',
         'blue',

@@ -14,7 +14,11 @@ from utilities.utility_functions import decode_polyline
 from utilities import config
 
 #ORS client to be shared among all methods
-client = openrouteservice.Client(key=st.secrets["matrix_key"])
+client = None
+if config.vrp_opts["ors_server"] == "Default":
+    client = openrouteservice.Client(key=st.secrets["ors_key"])
+else:
+    client = openrouteservice.Client(key=st.secrets["ors_key"],base_url=config.vrp_opts["ors_server"])
 def query_matrix(nodes):
     '''
     Takes a list of coordinate pairs (lon,lat) and returns matrix based on configured/selected
@@ -23,7 +27,7 @@ def query_matrix(nodes):
     :return: matrix of appropriate arc costs
     '''
 
-    matrix = distance_matrix.distance_matrix(client,locations=nodes,profile='driving-car')
+    matrix = distance_matrix.distance_matrix(client,locations=nodes,profile=st.session_state["matrix_profile"])
     return matrix["durations"]
 def geocode_addresses(addresses):
     '''
@@ -147,7 +151,7 @@ def print_solution(addresses,nodes, manager, routing, solution):
         st.write(plan_output)
         max_route_distance = max(route_distance, max_route_distance)
 
-        route = directions(client=client,coordinates=node_coordinates,profile="driving-car")
+        route = directions(client=client,coordinates=node_coordinates,profile=st.session_state["matrix_profile"])
 
         coords = decode_polyline(route["routes"][0]["geometry"],False)
         #add the nodes
@@ -163,14 +167,23 @@ def print_solution(addresses,nodes, manager, routing, solution):
 
     streamlit_folium.folium_static(m,width=700)
 
+def rate_limited_generic_vrp(addresses):
+    '''
+    Imposes the configured limit on the size of problem instance to avoid exhausting the API key inadvertently.
+    :param addresses:
+    :return:
+    '''
+    if len(addresses.index) >  config.vrp_opts["max_num_nodes"]:
+        st.write(f"Your problem instance is larger than the maximum configured size of {config.vrp_opts['max_num_nodes']}")
+    else:
+        generic_vrp(addresses)
 def main():
     #add session state location for addresses
     if 'input_addresses' not in st.session_state:
         st.session_state["input_addresses"] = pd.DataFrame()
 
     #configure traveller profile and cost type
-    st.selectbox(label="Traveller Profile",options=config.vrp_opts["matrix_profile_opts"],key='matrix_profile')
-    st.selectbox(label = "Arc Cost Type",options=["distance","duration"],key="matrix_metric")
+    st.selectbox(label="Traveller Profile",options=config.vrp_opts["ors_matrix_profile_opts"],key='matrix_profile')
 
     #select number of vehicles
     st.text_input("Number of Vehicles",key="num_vehicles",value=1)
@@ -182,7 +195,7 @@ def main():
     st.session_state["input_addresses"] = st.experimental_data_editor(data=st.session_state["addresses_df"],num_rows="dynamic",key="edited_addresses_df")
 
     #run address query
-    st.button("Run Optimization",on_click=generic_vrp,args=[(st.session_state["input_addresses"])["Address to Visit"]])
+    st.button("Run Optimization",on_click=rate_limited_generic_vrp,args=[(st.session_state["input_addresses"])["Address to Visit"]])
 
 if __name__ == "__main__":
     main()
