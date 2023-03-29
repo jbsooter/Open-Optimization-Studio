@@ -33,7 +33,7 @@ vrp_opts = dict(
     matrix_provider = 'Mapbox', #options [Mapbox,ORS]
     matrix_server = 'Default', #options [Default,Local]
     matrix_profile_opts = provider_specific_profile_opts["Mapbox"], #pass through parameters that depend on matrix_provider
-    geocoding_provider = 'Mapbox', #currently only option, others will be implemented in future
+    geocoding_provider = 'ORS', #currently only option, others will be implemented in future
     folium_colors = [
         'red',
         'blue',

@@ -12,7 +12,7 @@ from calendar_view.core.config import CalendarConfig
 from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
-from utilities import timeblockingutils
+from utilities import utility_functions
 from utilities import config
 
 

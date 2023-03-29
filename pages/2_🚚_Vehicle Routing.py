@@ -1,15 +1,18 @@
 import folium
+import numpy as np
 import pandas as pd
-import pydeck as pdk
 import streamlit_folium
+import openrouteservice
+import streamlit as st
+from matplotlib import pyplot as plt
+
+from openrouteservice import distance_matrix
+from openrouteservice.directions import directions
+from openrouteservice.geocode import pelias_search
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
+from utilities.utility_functions import decode_polyline
 from utilities import config
-
-import streamlit as st
-from routingpy import MapboxOSRM, ORS
-from geopy.geocoders import MapBox
-
 
 def query_matrix(nodes):
     '''
@@ -18,33 +21,22 @@ def query_matrix(nodes):
     :param nodes:
     :return: matrix of appropriate arc costs
     '''
-    matrix = None
-    if config.vrp_opts["matrix_provider"] == 'Mapbox':
-        client = MapboxOSRM(api_key=st.secrets["matrix_key"])
-        matrix = client.matrix(locations=nodes,profile=st.session_state["matrix_profile"],annotations=[st.session_state["matrix_metric"]])
-    elif config.vrp_opts["matrix_provider"] == 'ORS':
-        client = ORS(api_key=st.secrets["matrix_key"])
-        matrix = client.matrix(locations=nodes,profile=st.session_state["matrix_profile"],metrics=[st.session_state["matrix_metric"]])
 
-    if st.session_state["matrix_metric"] == 'distance':
-        #st.write(matrix.distances)
-        return matrix.distances
-    else:
-        #st.write(matrix.durations)
-        return matrix.durations
-
+    client = openrouteservice.Client(key=st.secrets["matrix_key"])
+    matrix = distance_matrix.distance_matrix(client,locations=nodes,profile='driving-car')
+    return matrix["durations"]
 def geocode_addresses(addresses):
     '''
     Take a list of addresses and convert to coordinate pairs.
     :param addresses:
     :return: list of coordinate pairs (lon,lat)
     '''
-    geolocator = MapBox(api_key=st.secrets["geocoding_key"])
+    client = openrouteservice.Client(key=st.secrets['matrix_key'],base_url='https://api.openrouteservice.org/')
 
     coordinates = []
     for location in addresses:
-        result = geolocator.geocode(location)
-        coordinates.append([result.longitude, result.latitude])
+        result = pelias_search(client=client,text=location)
+        coordinates.append([result["bbox"][0], result["bbox"][1]])
 
     return coordinates
 
@@ -52,8 +44,6 @@ def generic_vrp(addresses):
     nodes = geocode_addresses(addresses)
     #identify depot
     depot_index = 0
-
-    st.write(st.session_state["input_addresses"])
 
     #query cost matrix
     arc_cost_matrix = query_matrix(nodes=nodes)
@@ -70,7 +60,7 @@ def generic_vrp(addresses):
         # Convert from routing variable Index to distance matrix NodeIndex.
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return query_matrix(nodes=nodes)[from_node][to_node]
+        return arc_cost_matrix[from_node][to_node]
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
 
@@ -81,21 +71,58 @@ def generic_vrp(addresses):
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
+    search_parameters.solution_limit = 1
+
+    #create solutionCollector
+    all_solutions = routing.solver().AllSolutionCollector()
+
+    #give access to node vars
+    for node in range(len(arc_cost_matrix)):
+        all_solutions.Add(routing.NextVar(manager.NodeToIndex(node)))
+
+    for v in range(int(st.session_state["num_vehicles"])):
+        all_solutions.Add(routing.NextVar(routing.Start(v)))
+
+    #add as monitor to solver
+    routing.AddSearchMonitor(all_solutions)
 
     # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
 
+    #give access to objective var
+    all_solutions.AddObjective(routing.CostVar())
+
+    st.write(all_solutions.SolutionCount())
+
+    #add as monitor to solver
+    routing.AddSearchMonitor(all_solutions)
+    # Solve the problem fully.
+    search_parameters.solution_limit = 10
+
+    solution = routing.SolveWithParameters(search_parameters)
     # Print solution on console.
     if solution:
-        print_solution(addresses,nodes, manager, routing, solution)
+        #for i in range(1,all_solutions.SolutionCount()): #1 to skip repeat initial
+        st.write(all_solutions.ObjectiveValue(all_solutions.SolutionCount()-1))
+        print_solution(addresses,nodes, manager, routing, all_solutions.Solution(all_solutions.SolutionCount()-1))
+
+        #chart improvement
+        x = []
+        y = []
+        for i in range(1,all_solutions.SolutionCount()): #1 to skip repeat initial
+            x.append(i)
+            y.append(all_solutions.ObjectiveValue(i))
+
+        # plot
+        fig, ax = plt.subplots()
+
+        ax.plot(x, y)
+
+        st.pyplot(fig=fig)
+
     else:
         print('No solution found !')
 
-
-
-
-#TODO: MODIFY TO BUILD MAP
-#will need to get polylines from route of routingpy
 def print_solution(addresses,nodes, manager, routing, solution):
     """Prints solution on console."""
     st.write(f'Objective: {solution.ObjectiveValue()}')
@@ -121,22 +148,10 @@ def print_solution(addresses,nodes, manager, routing, solution):
         st.write(plan_output)
         max_route_distance = max(route_distance, max_route_distance)
 
-        #TODO: support ORS here
-        client = MapboxOSRM(api_key=st.secrets["matrix_key"])
-        route = client.directions(locations=node_coordinates,profile=st.session_state["matrix_profile"])
-        #st.write(route.geometry)
-        map_df = pd.DataFrame(route.geometry)
-        map_df.rename(columns = {0: "LON",1:"LAT"},inplace=True)
-        #st.map(map_df)
+        client = openrouteservice.Client(key=st.secrets['matrix_key'],base_url='https://api.openrouteservice.org/')
+        route = directions(client=client,coordinates=node_coordinates,profile="driving-car")
 
-        # use the response
-        mls = map_df
-
-
-        coords = []
-        for x in route.geometry:
-            coords.append([x[1],x[0]])
-
+        coords = decode_polyline(route["routes"][0]["geometry"],False)
         #add the nodes
         for i in range(0,len(node_coordinates)-1): #TODO: double check this range
             folium.Marker([node_coordinates[i][1],node_coordinates[i][0]],popup=addresses[i]).add_to(m)
@@ -150,8 +165,6 @@ def print_solution(addresses,nodes, manager, routing, solution):
 
     streamlit_folium.folium_static(m,width=700)
 
-def displays():
-    st.write(st.session_state.addresses_df)
 def main():
     #add session state location for addresses
     if 'input_addresses' not in st.session_state:
@@ -164,15 +177,14 @@ def main():
     #select number of vehicles
     st.text_input("Number of Vehicles",key="num_vehicles",value=1)
 
-
     #input addresses
     st.session_state.addresses_df = pd.DataFrame(
         {"Address to Visit":["800 W Dickson St, Fayetteville, Ar 72701","1270 W Leroy Pond Dr, Fayetteville, AR 72701"],"depot":[True,False]}
     )
-    st.session_state["input_addresses"] = st.experimental_data_editor(data=st.session_state["addresses_df"],num_rows="dynamic",key="edited_addresses_df",on_change=displays)
+    st.session_state["input_addresses"] = st.experimental_data_editor(data=st.session_state["addresses_df"],num_rows="dynamic",key="edited_addresses_df")
 
     #run address query
-    st.button("Run Matrix Query",on_click=generic_vrp,args=[(st.session_state["input_addresses"])["Address to Visit"]])
+    st.button("Run Optimization",on_click=generic_vrp,args=[(st.session_state["input_addresses"])["Address to Visit"]])
 
 if __name__ == "__main__":
     main()
