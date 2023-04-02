@@ -44,6 +44,8 @@ def geocode_addresses(addresses):
     return coordinates
 
 def generic_vrp(addresses):
+    if 'vrp_solution' not in st.session_state:
+        st.session_state['vrp_solution'] = {'text':None,'map':None,'improvement':None}
     nodes = geocode_addresses(addresses)
     #identify depot
     depot_index = 0
@@ -95,8 +97,6 @@ def generic_vrp(addresses):
     #give access to objective var
     all_solutions.AddObjective(routing.CostVar())
 
-    st.write(all_solutions.SolutionCount())
-
     #add as monitor to solver
     routing.AddSearchMonitor(all_solutions)
     # Solve the problem fully.
@@ -121,51 +121,63 @@ def generic_vrp(addresses):
 
         ax.plot(x, y)
 
-        st.pyplot(fig=fig)
+        st.session_state['vrp_solution']['improvement'] = fig
 
     else:
         print('No solution found !')
 
 def print_solution(addresses,nodes, manager, routing, solution):
     """Prints solution on console."""
-    st.write(f'Objective: {solution.ObjectiveValue()}')
+    text_solution = []
+    text_solution.append( f'Objective: {solution.ObjectiveValue()}\n')
     max_route_distance = 0
     m = folium.Map()
+    routes_all = []
     for vehicle_id in range(int(st.session_state["num_vehicles"])):
         index = routing.Start(vehicle_id)
-        plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
+        plan_output = 'Route for vehicle {}: '.format(vehicle_id)
         route_distance = 0
         node_coordinates = []
         while not routing.IsEnd(index):
             #build input for route
-            node_coordinates.append(nodes[manager.IndexToNode(index)])
-            #plan_output += ' {} -> '.format(manager.IndexToNode(index))
+            if index < len(addresses) :
+                node_coordinates.append({'index': index,'coordinates':nodes[manager.IndexToNode(index)]})
+            else:#set index in dict of artificial depot to 0
+                node_coordinates.append({'index': 0,'coordinates':nodes[manager.IndexToNode(index)]})
+            plan_output += ' {} -> '.format(addresses[manager.IndexToNode(index)])
             previous_index = index
             index = solution.Value(routing.NextVar(index))
 
             route_distance += routing.GetArcCostForVehicle(
                 previous_index, index, vehicle_id)
-        #plan_output += '{}\n'.format(manager.IndexToNode(index))
-        node_coordinates.append(nodes[manager.IndexToNode(index)])
-        plan_output += 'Distance of the route: {}m\n'.format(route_distance)
-        st.write(plan_output)
+
+        plan_output += '{}\n'.format(addresses[manager.IndexToNode(index)])
+        text_solution.append(plan_output)
+        if index < len(addresses) :
+            node_coordinates.append({'index': index,'coordinates':nodes[manager.IndexToNode(index)]})
+        else: #set index in dict of artificial depot to 0
+            node_coordinates.append({'index': 0,'coordinates':nodes[manager.IndexToNode(index)]})
+        text_solution.append('Distance of the route: {} m\n'.format(route_distance))
         max_route_distance = max(route_distance, max_route_distance)
 
-        route = directions(client=client,coordinates=node_coordinates,profile=st.session_state["matrix_profile"])
+        route = directions(client=client,coordinates=[x["coordinates"] for x in node_coordinates],profile=st.session_state["matrix_profile"])
 
         coords = decode_polyline(route["routes"][0]["geometry"],False)
         #add the nodes
-        for i in range(0,len(node_coordinates)-1): #TODO: double check this range
-            folium.Marker([node_coordinates[i][1],node_coordinates[i][0]],popup=addresses[i]).add_to(m)
+        for i in range(0,len(node_coordinates)): #-1 because depot included twice once at begin once at end
+            folium.Marker([node_coordinates[i]["coordinates"][1],node_coordinates[i]["coordinates"][0]],popup=addresses[node_coordinates[i]["index"]]).add_to(m)
         # add the lines
         folium.PolyLine(coords, weight=5, opacity=1,color=config.vrp_opts["folium_colors"][vehicle_id]).add_to(m)
+        routes_all.append(route)
     # create optimal zoom
     nodes_all_df = pd.DataFrame(nodes).rename(columns={0:'Lon', 1:'Lat'})[['Lat', 'Lon']]
     sw = nodes_all_df[['Lat', 'Lon']].min().values.tolist()
     ne = nodes_all_df[['Lat', 'Lon']].max().values.tolist()
     m.fit_bounds([sw, ne])
 
-    streamlit_folium.folium_static(m,width=700)
+    st.session_state['vrp_solution']['map'] = m
+    st.session_state['vrp_solution']['text'] = text_solution
+    st.session_state['vrp_solution']['routes'] = routes_all
 
 def rate_limited_generic_vrp(addresses):
     '''
@@ -190,12 +202,18 @@ def main():
 
     #input addresses
     st.session_state.addresses_df = pd.DataFrame(
-        {"Address to Visit":["800 W Dickson St, Fayetteville, Ar 72701","1270 W Leroy Pond Dr, Fayetteville, AR 72701"],"depot":[True,False]}
+        {"Address to Visit":["800 W Dickson St, Fayetteville, Ar 72701","1270 Nolan Richardson Dr, Fayetteville, AR 72701","3919 N Mall Ave, Fayetteville, AR 72703"],"depot":[True,False,False]}
     )
     st.session_state["input_addresses"] = st.experimental_data_editor(data=st.session_state["addresses_df"],num_rows="dynamic",key="edited_addresses_df")
 
     #run address query
     st.button("Run Optimization",on_click=rate_limited_generic_vrp,args=[(st.session_state["input_addresses"])["Address to Visit"]])
+
+    if 'vrp_solution'  in st.session_state:
+        for x in st.session_state['vrp_solution']['text']:
+            st.write(x)
+        streamlit_folium.folium_static(st.session_state['vrp_solution']['map'],width=700)
+        st.pyplot(st.session_state['vrp_solution']['improvement'])
 
 if __name__ == "__main__":
     main()
