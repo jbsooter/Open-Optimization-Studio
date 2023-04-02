@@ -1,32 +1,33 @@
-#this file is used as a central location to set non-secret configuration parameters.
-#for API-keys and other "secret" info, follow the local deployment instructions and create a secrets.toml file at .streamlit/secrets.toml
+# this file is used as a central location to set non-secret configuration parameters.
+# for API-keys and other "secret" info, follow the local deployment
+# instructions and create a secrets.toml file at .streamlit/secrets.toml
 from calendar_view.core.event import EventStyles
 
-#global options
+# global options
 solver_backend = dict(
-    linear = "GLOP",
-    mip = "CP_SAT",
-    constraint = "CP_SAT"
-    #These Solvers are free and open source for commerical use. They are developed and supported by Google's Operations Research group.
-    #SCIP can be used for mip and linear for academic purposes only.
+    linear="GLOP",
+    mip="CP_SAT",
+    constraint="CP_SAT"
+    # These Solvers are free and open source for commerical use. They are developed and supported by Google's Operations Research group.
+    # SCIP can be used for mip and linear for academic purposes only.
 )
 
-#Linear Programming module options
-#color options for 2-var visualization
-#options: any recognized colors from matplotlib
+# Linear Programming module options
+# color options for 2-var visualization
+# options: any recognized colors from matplotlib
 two_var_color_defaults = dict(
-    infeasible = 'white',
-    feasible = 'lightgreen',
-    contour = 'darkgreen',
-    gradient  = 'blue'
+    infeasible='white',
+    feasible='lightgreen',
+    contour='darkgreen',
+    gradient='blue'
 )
 
-#Vehicle Routing options
+# Vehicle Routing options
 vrp_opts = dict(
-    ors_server = 'Default', #options [Default,insert/url/here]
-    ors_matrix_profile_opts =  ['driving-car','foot-walking','cycling-regular'],
-    max_num_nodes = 8,
-    folium_colors = [
+    ors_server='Default',  # options [Default,insert/url/here]
+    ors_matrix_profile_opts=['driving-car', 'foot-walking', 'cycling-regular'],
+    max_num_nodes=8,
+    folium_colors=[
         'red',
         'blue',
         'gray',
@@ -45,27 +46,27 @@ vrp_opts = dict(
         'cadetblue',
         'lightgray',
         'black'
-] #colors to rotate through for tours. these are all possible
+    ]  # colors to rotate through for tours. these are all possible
 )
 
 
-#Scheduling options
+# Scheduling options
 scheduling_opts = dict(
 
 )
 
-#Network Options
+# Network Options
 network_flows_opts = dict(
 
 )
 
-#Knapsack Options
+# Knapsack Options
 knapsack_opts = dict(
 
 )
 
-#Time Blocking module options
-calendar_opts = dict (
+# Time Blocking module options
+calendar_opts = dict(
     lang='en',
     title='Task Schedule',
     show_date=True,
@@ -74,13 +75,6 @@ calendar_opts = dict (
 )
 
 calendar_event_opts = dict(
-    event_display_color = EventStyles.GREEN,
-    task_display_color = EventStyles.BLUE
+    event_display_color=EventStyles.GREEN,
+    task_display_color=EventStyles.BLUE
 )
-
-
-
-
-
-
-
