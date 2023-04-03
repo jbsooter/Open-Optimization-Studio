@@ -305,23 +305,23 @@ def model_builder():
     # forall periods on horizon
     for k in range(0, int(num_periods)):
         # none before working hours
-        if period_in_day < timeblockingutils.working_hour_str_to_num(
-                st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][0]) * 4:
+        if period_in_day < utility_functions.working_hour_str_to_num(
+                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][0]) * 4:
             a_k[k] = 0
 
         # none after working hours
-        if period_in_day >= timeblockingutils.working_hour_str_to_num(
-                st.session_state[f'hours_{timeblockingutils.day_of_week_int_to_str(current_day)}'][1]) * 4:
+        if period_in_day >= utility_functions.working_hour_str_to_num(
+                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][1]) * 4:
             a_k[k] = 0
 
         # if day is not a workday then make it unavailable
         for weekday in range(0, 7):
             if (current_day == weekday) & (
-                    st.session_state[f"workday_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is False):
+                    st.session_state[f"workday_{utility_functions.day_of_week_int_to_str(weekday)}"] is False):
                 a_k[k] = 0
             # if a day is preferred, double its value in the objective
             if (current_day == weekday) & (
-                    st.session_state[f"preferred_{timeblockingutils.day_of_week_int_to_str(weekday)}"] is True):
+                    st.session_state[f"preferred_{utility_functions.day_of_week_int_to_str(weekday)}"] is True):
                 p_k[k] = 2
 
         # increment period within day if there are periods remaining
@@ -342,7 +342,7 @@ def model_builder():
     r_i = []
     for x in range(0, st.session_state['number_of_tasks']):
         r_i.append(
-            timeblockingutils.time_increment_to_num_periods(
+            utility_functions.time_increment_to_num_periods(
                 st.session_state[f"task_{x+1}_time"]))
 
     # create due date in terms of period
@@ -451,7 +451,7 @@ def main():
                     label='Working Hours',
                     key=(
                         'hours_' + x),
-                    options=timeblockingutils.working_hours_list,
+                    options=utility_functions.working_hours_list,
                     value=(
                         '8 AM',
                         '5 PM'))
@@ -470,7 +470,7 @@ def main():
         with col2:
             st.selectbox(
                 label='Task Length',
-                options=timeblockingutils.time_increments_list,
+                options=utility_functions.time_increments_list,
                 key=f"task_{x+1}_time",
                 index=3)
         with col3:

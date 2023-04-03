@@ -1,4 +1,5 @@
 import folium
+import numpy as np
 import pandas as pd
 import streamlit_folium
 import openrouteservice
@@ -136,12 +137,21 @@ def generic_vrp(addresses):
             x.append(i)
             y.append(all_solutions.ObjectiveValue(i))
 
-        # plot
-        fig, ax = plt.subplots()
+        if len(y) > 1:
+            # plot
+            fig, ax = plt.subplots()
+            ax.set_title("Objective vs Metahueristic Iteration")
 
-        ax.plot(x, y)
+            ax.plot(x, y)
+            ax.set_xlabel('Metaheuristic Iteration')
+            ax.set_ylabel('Objective Value')
 
-        st.session_state['vrp_solution']['improvement'] = fig
+            #set x ticks to be integer over all iterations
+            plt.xticks(np.arange(1,all_solutions.SolutionCount(),1))
+
+            st.session_state['vrp_solution']['improvement'] = fig
+        else:
+            st.session_state['vrp_solution']['improvement'] = None
 
     else:
         print('No solution found !')
@@ -271,7 +281,8 @@ def main():
             st.write(x)
         streamlit_folium.folium_static(
             st.session_state['vrp_solution']['map'], width=700)
-        st.pyplot(st.session_state['vrp_solution']['improvement'])
+        if st.session_state['vrp_solution']['improvement'] is not None:
+            st.pyplot(st.session_state['vrp_solution']['improvement'])
 
 
 if __name__ == "__main__":
