@@ -254,7 +254,7 @@ def main():
         key='matrix_profile')
 
     # select number of vehicles
-    st.text_input("Number of Vehicles", key="num_vehicles", value=1)
+    st.number_input("Number of Vehicles", key="num_vehicles", value=1,step=1)
 
     # input addresses
     st.session_state.addresses_df = pd.DataFrame(
