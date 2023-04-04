@@ -130,3 +130,6 @@ dmypy.json
 
 # IntelliJ
 .idea/
+.streamlit/secrets.toml
+
+images/
