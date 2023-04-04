@@ -83,6 +83,16 @@ def generic_vrp(addresses):
     # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
+    # add homogenous vehicle capacity
+    def cb(a,b):
+        if(a != 0 ) & (b != 0):
+            return 1
+        else:
+            #no cost to capacity if depot
+            return 0
+    demand_callback_index = routing.RegisterTransitCallback(cb)
+    routing.AddDimension(demand_callback_index,0,st.session_state["vehicle_capacity"],True,'capacity')
+
     # Setting first solution heuristic.
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
@@ -154,7 +164,9 @@ def generic_vrp(addresses):
             st.session_state['vrp_solution']['improvement'] = None
 
     else:
-        print('No solution found !')
+        st.session_state['vrp_solution']['text'] = ["No solution found !"]
+        st.session_state['vrp_solution']['improvement'] = None
+        st.session_state['vrp_solution']['map'] = None
 
 
 def print_solution(addresses, nodes, manager, routing, solution):
@@ -256,6 +268,9 @@ def main():
     # select number of vehicles
     st.number_input("Number of Vehicles", key="num_vehicles", value=1,step=1)
 
+    # select vehicle capacity
+    st.number_input("Vehicle Order Capacity", key="vehicle_capacity",value=3,step=1)
+
     # input addresses
     st.session_state.addresses_df = pd.DataFrame(
         {
@@ -279,8 +294,10 @@ def main():
     if 'vrp_solution' in st.session_state:
         for x in st.session_state['vrp_solution']['text']:
             st.write(x)
-        streamlit_folium.folium_static(
-            st.session_state['vrp_solution']['map'], width=700)
+
+        if st.session_state['vrp_solution']['map'] is not None:
+            streamlit_folium.folium_static(
+                st.session_state['vrp_solution']['map'], width=700)
         if st.session_state['vrp_solution']['improvement'] is not None:
             st.pyplot(st.session_state['vrp_solution']['improvement'])
 
