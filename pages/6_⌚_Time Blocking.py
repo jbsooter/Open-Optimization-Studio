@@ -417,12 +417,13 @@ def main():
         on_change=import_calendar)
 
     # input planning horizon
-    st.date_input("Start", value=datetime.today(), key="begin_horizon")
+    st.date_input("Start", value=datetime.today(), help="Planning Horizon is inclusive of this date", key="begin_horizon")
     st.date_input(
         "End",
         value=datetime.today() +
         timedelta(
             days=7),
+        help="Planning Horizon is inclusive of this date",
         key="end_horizon")
 
     work_time_expander = st.expander(
