@@ -9,7 +9,7 @@ TODO: Introductory Example
 
 ## Guides
 
-* [Linear Programming](docs/Linear Programming.md)
-* [Vehicle Routing](docs/Vehicle Routing.md)
-* [Time Blocking](docs/Time Blocking.md)
-* [Local Deployment](docs/Local Deployment.md)
+* [Linear Programming](https://jbsooter.github.io/Open-Optimization-Studio/Linear%20Programming)
+* [Vehicle Routing](https://jbsooter.github.io/Open-Optimization-Studio/Vehicle%20Routing)
+* [Time Blocking](https://jbsooter.github.io/Open-Optimization-Studio/Time%20Blocking)
+* [Local Deployment](https://jbsooter.github.io/Open-Optimization-Studio/Local%20Deployment)
