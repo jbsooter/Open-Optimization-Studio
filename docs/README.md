@@ -1,7 +1,7 @@
 # Open Optimization Studio User Guide
 Web-app built with Streamlit to harness the power of Google OR-Tools' Optimization Suite in a web-based, low code environment.
 
-[Public Web App](https://open-optimization-studio.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://open-optimization-studio.streamlit.app)
 
 ## Getting Started
 
