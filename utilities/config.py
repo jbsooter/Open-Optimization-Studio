@@ -25,7 +25,15 @@ two_var_color_defaults = dict(
 # Vehicle Routing options
 vrp_opts = dict(
     ors_server='Default',  # options [Default,insert/url/here]
-    ors_matrix_profile_opts=['driving-car', 'foot-walking', 'cycling-regular'],
+    ors_matrix_profile_opts=['driving-car',
+                             'foot-walking',
+                             'cycling-regular',
+                             'cycling-electric',
+                             'cycling-mountain',
+                             'cycling-road',
+                             'driving-hgv',
+                             'foot-hiking',
+                             'wheelchair'],
     max_num_nodes=8,
     folium_colors=[
         'red',
@@ -46,7 +54,9 @@ vrp_opts = dict(
         'cadetblue',
         'lightgray',
         'black'
-    ]  # colors to rotate through for tours. these are all possible
+    ] , # colors to rotate through for tours. these are all possible
+    cost_metrics =
+    ['distance','duration']
 )
 
 

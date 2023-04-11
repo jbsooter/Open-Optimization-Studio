@@ -33,8 +33,11 @@ def query_matrix(nodes):
     '''
 
     matrix = distance_matrix.distance_matrix(
-        client, locations=nodes, profile=st.session_state["matrix_profile"])
-    return matrix["durations"]
+        client, locations=nodes, profile=st.session_state["matrix_profile"], metrics=['distance','duration'], units='mi')
+    if st.session_state["cost_metric"] == 'distance':
+        return matrix["distances"]
+    elif st.session_state['cost_metric'] == 'duration':
+        return matrix["durations"]
 
 
 def geocode_addresses(addresses):
@@ -206,7 +209,7 @@ def print_solution(addresses, nodes, manager, routing, solution):
             node_coordinates.append(
                 {'index': 0, 'coordinates': nodes[manager.IndexToNode(index)]})
         text_solution.append(
-            'Distance of the route: {} m\n'.format(route_distance))
+            'Cost of the route: {} \n'.format(route_distance))
         max_route_distance = max(route_distance, max_route_distance)
 
         route = directions(
@@ -265,6 +268,13 @@ def main():
         options=config.vrp_opts["ors_matrix_profile_opts"],
         key='matrix_profile')
 
+    st.selectbox(
+        label="Cost Metric",
+        options=config.vrp_opts["cost_metrics"],
+        key='cost_metric',
+        help='distance is in miles, duration is in seconds'
+    )
+
     # select number of vehicles
     st.number_input("Number of Vehicles", key="num_vehicles", value=1,step=1)
 
@@ -300,6 +310,16 @@ def main():
                 st.session_state['vrp_solution']['map'], width=700)
         if st.session_state['vrp_solution']['improvement'] is not None:
             st.pyplot(st.session_state['vrp_solution']['improvement'])
+        if st.session_state['vrp_solution']['routes'] is not None:
+            with st.expander(label="Detailed Directions"):
+                veh_count = 1
+                for x in st.session_state['vrp_solution']['routes']:
+                    st.subheader(f"Vehicle {veh_count}")
+                    for y in x["routes"][0]["segments"]:
+                        for z in y["steps"]:
+                            st.write(z["instruction"])
+                    veh_count = veh_count + 1
+
 
 
 if __name__ == "__main__":
