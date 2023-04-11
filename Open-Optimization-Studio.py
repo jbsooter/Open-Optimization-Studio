@@ -6,9 +6,14 @@ def main():
     )
     st.title("🌐 Open Optimization Studio")
     st.subheader("Web-Based Optimization Powered by Google OR-Tools")
+
     st.write(
         """
-        
+          Plan your next road trip (🚚 Vehicle Routing), figure out when to get your work done (⌚ Time Blocking),
+          or learn more about building your own optimizaton problems (💻 Linear Programming).
+          
+          To learn more, check out the [User Guide](https://jbsooter.github.io/Open-Optimization-Studio/). 
+          
         """
     )
 
