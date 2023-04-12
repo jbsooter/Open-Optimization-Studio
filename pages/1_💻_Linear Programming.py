@@ -360,17 +360,61 @@ def two_var_graphical_solution():
 def solve_lp_file(lp_string):
     # https://github.com/google/or-tools/issues/523
     # https://web.mit.edu/lpsolve/doc/lp-format.htm
-# Define your custom highlight rules
 
-
+    #declare modelBuilder and solver objects
     model = mb.ModelBuilder()
-    model.import_from_lp_string(lp_string=lp_string)
     solver = mb.ModelSolver('CP-SAT')
-    solver.solve(model)
 
+    #import LP format model from ace editor component
+    model.import_from_lp_string(lp_string=lp_string)
 
-    st.write(solver.objective_value)
+    #verify that model imported successfully. If not, end method and show error message
+    if model.num_variables == 0:
+        st.error("LP Model Import Failed. Try Again. ")
+        return
 
+    # solve model
+    status = solver.solve(model)
+
+    # update solution status. TOD:ckean up
+    st.session_state['solution_message'] = str(status)
+
+    # print out variable values to ensure working
+    # variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    # for x in variables:
+    #    st.write(x.name + ": " +  str(solver.value(x)))
+
+    # convert soluiton to df
+    # Create an empty dictionary to store the column names and values
+    solution = {}
+
+    # Add the objective value to the dictionary
+    solution["obj"] = solver.objective_value
+
+    # Loop through the variables and add their names and values to the dictionary
+    variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    for x in variables:
+        solution[x.name] = solver.value(x)
+
+    st.session_state['lp_type'] = 'lp'
+    for x in variables:
+        if x.is_integral:
+            st.session_state['lp_type'] = 'mip'
+            st.session_state['sensitivity_analysis'] = None
+    # Convert the dictionary to a DataFrame
+    df = pd.DataFrame(solution, index=[0])
+
+    #update solution session state
+    st.session_state['last_solution'] = df
+
+    if st.session_state['lp_type'] == 'lp':
+        #solver.activity(model.cons)
+        #o = [{'Name': c.name(),
+        #  'Shadow Price': c.dual_value(),
+        #  'Slack': c.ub() - activities[i]} for i,
+        #                                       c in enumerate(solver.constraints())]
+        #todo produce this
+        st.session_state["sensitivity_analysis"] = None
 def main():
     st.set_page_config(layout="wide")
 
@@ -429,20 +473,20 @@ def main():
     if st.session_state['model_mode_lp'] == 'LP':
         st.write("experiment")
 
-
         lp_editor= st_ace("""max: 3x + 5y;
 
-c1: 2x + y <= 10;
+        c1: 2x + y <= 10;
 
-c2: x + 3y <= 12;
+        c2: x + 3y <= 12;
 
-c3: x + y >= 5;
+        c3: x + y >= 5;
 
-x >= 0;
+        x >= 0;
 
-y >= 0;""", language='python',auto_update=True)
+        y >= 0;""",
+                          language='text'
+                          ,auto_update=True)
 
-        #st.write(streamlit_ace.LANGUAGES)
 
 
         st.button(label="Solve model",key="solvelpmodel",on_click=solve_lp_file,args=[''.join(lp_editor)])
@@ -471,17 +515,21 @@ y >= 0;""", language='python',auto_update=True)
 
         st.button(label="Solve", on_click=solve_mip, help="Solves the model")
 
-        if st.session_state['hide_solution'] is False:
-            if 'last_solution' in st.session_state:
-                st.write(st.session_state['solution_message'])
-                st.write(st.session_state['last_solution'])
-            if st.session_state['lp_type'] is 'lp':
-                if 'sensitivity_analysis' in st.session_state:
-                    st.write("The sensitivity of the constraint set is as follows: ")
-                    st.write(st.session_state['sensitivity_analysis'])
+    if st.session_state['hide_solution'] is False:
+        if 'last_solution' in st.session_state:
+            st.write(st.session_state['solution_message'])
+            st.write(st.session_state['last_solution'])
+        if st.session_state['lp_type'] is 'lp':
+            if 'sensitivity_analysis' in st.session_state:
+                st.write("The sensitivity of the constraint set is as follows: ")
+                st.write(st.session_state['sensitivity_analysis'])
 
-        # determine if a graphical solution can be generated
-        figure = two_var_graphical_solution()
+        #TODO: Support Graphical with LP Format
+        if st.session_state['model_mode_lp'] == 'LP':
+            figure = None
+        else:
+            # determine if a graphical solution can be generated
+            figure = two_var_graphical_solution()
 
         if st.session_state['hide_solution'] is False:
             # if a graphical solution generated, display it
