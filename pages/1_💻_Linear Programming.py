@@ -2,8 +2,11 @@ import io
 
 import streamlit as st
 import pandas as pd
+import streamlit_ace
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
+from ortools.linear_solver.python import model_builder as mb
+from streamlit_ace import st_ace
 
 from utilities import config
 
@@ -354,11 +357,25 @@ def two_var_graphical_solution():
             # return no figure
             return None
 
+def solve_lp_file(lp_string):
+    # https://github.com/google/or-tools/issues/523
+    # https://web.mit.edu/lpsolve/doc/lp-format.htm
+# Define your custom highlight rules
+
+
+    model = mb.ModelBuilder()
+    model.import_from_lp_string(lp_string=lp_string)
+    solver = mb.ModelSolver('CP-SAT')
+    solver.solve(model)
+
+
+    st.write(solver.objective_value)
 
 def main():
     st.set_page_config(layout="wide")
 
     st.title("Linear Programming")
+
     # initialize session default data
     if 'df_mip' not in st.session_state:
         st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c', 2.0, 1.0, 1.0], dtype='string'), 'var2': pd.Series(
@@ -372,27 +389,31 @@ def main():
         st.session_state.solver_backend = None
     if 'lp_type' not in st.session_state:
         st.session_state.lp_type = None
+
+
     # setup sidebar
     # allow for File I/O
     with st.sidebar:
-        st.header("Model Input/Output")
-        st.file_uploader(
-            label="Upload an Excel Model",
-            type='.xlsx',
-            key="model_up",
-            on_change=upload_mip,
-            help="Import xlsx file containing model formulation")
-        st.download_button(
-            data=download_mip(),
-            label="Download Current Model",
-            file_name="model.xlsx",
-            help="Downloads formulation in xlsx format")
-        if 'last_solution' in st.session_state:
+        st.selectbox(label="Mode",options=['LP','Tableau'],index=0,key='model_mode_lp')
+        if st.session_state.model_mode_lp == 'Tableau':
+            st.header("Model Input/Output")
+            st.file_uploader(
+                label="Upload an Excel Model",
+                type='.xlsx',
+                key="model_up",
+                on_change=upload_mip,
+                help="Import xlsx file containing model formulation")
             st.download_button(
-                data=download_sol(),
-                label="Download Model + Solution",
-                file_name="model-solution.xlsx",
-                help="Downloads formulation, solution, and sensitivity report in xlsx format")
+                data=download_mip(),
+                label="Download Current Model",
+                file_name="model.xlsx",
+                help="Downloads formulation in xlsx format")
+            if 'last_solution' in st.session_state:
+                st.download_button(
+                    data=download_sol(),
+                    label="Download Model + Solution",
+                    file_name="model-solution.xlsx",
+                    help="Downloads formulation, solution, and sensitivity report in xlsx format")
         st.header("Settings")
         st.checkbox(
             "Do not render model",
@@ -403,48 +424,71 @@ def main():
             help="Improves performance for large solutions by hiding output dataframe",
             key="hide_solution")
         st.number_input("Time Limit (s)", value=60, key="time_limit")
-    # main page
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        if st.session_state["hide_model"] is False:
-            # load obj grid, save input
-            st.session_state['input_obj'] = st.experimental_data_editor(
-                st.session_state["df_obj"], num_rows="dynamic")
-            # load input grid, save input
-            st.session_state['input_mip'] = st.experimental_data_editor(
-                st.session_state["df_mip"], num_rows="dynamic")
 
-    with col2:
-        # adding white space. TODO: More elegant solution?
-        for x in range(0, 6):
-            st.write("")
+    #lp mit mode
+    if st.session_state['model_mode_lp'] == 'LP':
+        st.write("experiment")
 
-        # allow for additional variables
-        st.button(
-            label="Add Variable",
-            on_click=add_column,
-            help="Creates a new variable column")
 
-    st.button(label="Solve", on_click=solve_mip, help="Solves the model")
+        lp_editor= st_ace("""max: 3x + 5y;
 
-    if st.session_state['hide_solution'] is False:
-        if 'last_solution' in st.session_state:
-            st.write(st.session_state['solution_message'])
-            st.write(st.session_state['last_solution'])
-        if st.session_state['lp_type'] is 'lp':
-            if 'sensitivity_analysis' in st.session_state:
-                st.write("The sensitivity of the constraint set is as follows: ")
-                st.write(st.session_state['sensitivity_analysis'])
+c1: 2x + y <= 10;
 
-    # determine if a graphical solution can be generated
-    figure = two_var_graphical_solution()
+c2: x + 3y <= 12;
 
-    if st.session_state['hide_solution'] is False:
-        # if a graphical solution generated, display it
-        if figure is not None:
-            st.write("Graphical Representation")
-            col1, col2 = st.columns([3, 2])
-            col1.pyplot(figure)
+c3: x + y >= 5;
+
+x >= 0;
+
+y >= 0;""", language='python',auto_update=True)
+
+        #st.write(streamlit_ace.LANGUAGES)
+
+
+        st.button(label="Solve model",key="solvelpmodel",on_click=solve_lp_file,args=[''.join(lp_editor)])
+    elif st.session_state["model_mode_lp"] == 'Tableau':
+        # main page
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            if st.session_state["hide_model"] is False:
+                # load obj grid, save input
+                st.session_state['input_obj'] = st.experimental_data_editor(
+                    st.session_state["df_obj"], num_rows="dynamic")
+                # load input grid, save input
+                st.session_state['input_mip'] = st.experimental_data_editor(
+                    st.session_state["df_mip"], num_rows="dynamic")
+
+        with col2:
+            # adding white space. TODO: More elegant solution?
+            for x in range(0, 6):
+                st.write("")
+
+            # allow for additional variables
+            st.button(
+                label="Add Variable",
+                on_click=add_column,
+                help="Creates a new variable column")
+
+        st.button(label="Solve", on_click=solve_mip, help="Solves the model")
+
+        if st.session_state['hide_solution'] is False:
+            if 'last_solution' in st.session_state:
+                st.write(st.session_state['solution_message'])
+                st.write(st.session_state['last_solution'])
+            if st.session_state['lp_type'] is 'lp':
+                if 'sensitivity_analysis' in st.session_state:
+                    st.write("The sensitivity of the constraint set is as follows: ")
+                    st.write(st.session_state['sensitivity_analysis'])
+
+        # determine if a graphical solution can be generated
+        figure = two_var_graphical_solution()
+
+        if st.session_state['hide_solution'] is False:
+            # if a graphical solution generated, display it
+            if figure is not None:
+                st.write("Graphical Representation")
+                col1, col2 = st.columns([3, 2])
+                col1.pyplot(figure)
 
 
 if __name__ == "__main__":
