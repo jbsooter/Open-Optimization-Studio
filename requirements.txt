@@ -9,4 +9,3 @@ openrouteservice
 streamlit-folium
 folium
 streamlit-ace
-protobuf==3.19.6
