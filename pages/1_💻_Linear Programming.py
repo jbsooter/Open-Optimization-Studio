@@ -1,4 +1,5 @@
 import io
+import re
 
 import streamlit as st
 import pandas as pd
@@ -364,6 +365,23 @@ def solve_lp_file(lp_string):
     #declare modelBuilder and solver objects
     model = mb.ModelBuilder()
     solver = mb.ModelSolver('CP-SAT')
+
+    #Pre-OR-Tools Clean.
+    # 1. Removes // style comments.
+    # Assumes lp_string coming in as single string
+    # Split the input string by newline character
+    lines = lp_string.split("\n")
+
+    #remove comment from each line
+    for i in range(len(lines)):
+        if "//" in lines[i]:
+            lines[i] = lines[i].split("//")[0]
+
+    # rejoin strings to one and assign to lp_string
+    lp_string = "\n".join(lines)
+
+    #2. remove block comment \* *\
+    lp_string= re.sub(r'/\*.*?\*/','',lp_string)
 
     #import LP format model from ace editor component
     model.import_from_lp_string(lp_string=lp_string)
