@@ -14,13 +14,13 @@ This module allows the user to:
 
 Consider the following linear program: 
 
-max: $3x + 5y$
+max: $3x + 2y$
 
-$2x + y \leq 10$ (1)
+$2x + y \leq 100$ (1)
 
-$x + 3y \leq 12$ (2)
+$x + y \leq 80$ (2)
 
-$1x + 1y \geq 5$ (3)
+$1x  \leq 40$ (3)
 
 $x \geq 0$ (4)
 
@@ -32,21 +32,59 @@ In this model, x and y are positive, continuous variables. The LP would be repre
 
 | obj |var1 | var2 |
 | --- | --- | --- |
-| max | 3 | 5 |
+| max | 3 | 2 |
 
 | var1 |var2 | inequality | RHS |
 | --- | --- | --- | --- |
 | c | c |  | 
-| 2.0 | 1.0 | <= | 10.0 | 
-| 1.0 | 1.0 | <= | 12.0 | 
-| 1.0 | 0.0 | >=| 5.0 | 
+| 2.0 | 1.0 | <= | 100.0 | 
+| 1.0 | 1.0 | <= | 80.0 | 
+| 1.0 | 0.0 | <=| 40.0 | 
 
 Each column represents a variable. For example, **var1** is continous, as denoted by 'c'. Constraints 4 and 5 are not included in the tableau because all variables are assumed to be non-negative in standard form. 
 
-//TODO: show output and basic explanation of graphical representation and sensitivity
+After running the solver, you will see the following output. 
 
-//TODO: show example with binary and integer vars, changing names, negative coefficient
+An optimal solution was found in 0.001 s.
+
+| obj |var1 | var2 |
+| --- | --- | --- |
+| 180 | 20 | 60 |
+
+<!--- The sensitivity of the constraint set is as follows:
+Need to double check math on this. 
+| Name |Shadow Price | Slack |
+| --- | --- | --- |
+| c1 | 1 | 0 |
+| c2 | 1 | 0 |
+| c3 | 0 | 20 |
+-->
+[](/images/graphical-representation.png)
+
+If I wanted to model var1 as a binary variable, I would simply change the type declaration in the first row of the Tableau: 
+
+| var1 |var2 | inequality | RHS |
+| --- | --- | --- | --- |
+| b | c |  | 
+| 2.0 | 1.0 | <= | 100.0 | 
+| 1.0 | 1.0 | <= | 80.0 | 
+| 1.0 | 0.0 | <=| 40.0 | 
+
+After re-running the solver, you will obtain a new solution. 
+
+An optimal solution was found in 0.042 s.
+
+| obj |var1 | var2 |
+| --- | --- | --- |
+| 161 | 1 | 79 |
+
+Notice, no graphical representation appears because it is only available for two variable, continuous examples. 
+
+Additional constraints may be created with the **+** UI element at the bottom of the editable tableau. Additional variable columns can be created with the **Add Variable** button. 
+
 
 //TODO: show input, output, settings
 
 //TODO: activity
+
+//TODO: LP MIT format and limitations
