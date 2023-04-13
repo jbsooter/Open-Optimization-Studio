@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit_ace
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
-from ortools.linear_solver.python import model_builder as mb
+from ortools.model_builder.python import model_builder as mb
 from streamlit_ace import st_ace
 
 from utilities import config
