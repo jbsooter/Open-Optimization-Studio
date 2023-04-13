@@ -1,5 +1,5 @@
 streamlit
-ortools
+ortools==9.4.1874
 xlsxwriter
 openpyxl
 recurring-ical-events
