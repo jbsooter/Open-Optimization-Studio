@@ -6,12 +6,14 @@ Linear Programming is **"a method to achieve the best outcome (such as maximum p
 This module allows the user to: 
 
 - Define a linear or integer program in standard form and solve it. 
-- Perform basic sensitivity analysis on linear programs with exclusively continuous variables. 
+- Perform sensitivity analysis on linear programs with exclusively continuous variables. 
 - Visualize the solution to a two-variable linear program. 
-- Import/Export models and solutions as Excel files. 
 
 ### Formulating a Model
 
+Two methods are supplied for formulating a model. The first, [Tableau](Tableau) is implemented with streamlit's editable dataframe functionality, and is built around the traditional simplex tableau in mind. The second, [LP][LP], follows a modeling language created by MIT that closely follows mathematical notation for linear functions. 
+
+#### Tableau
 Consider the following linear program: 
 
 max: $3x + 2y$
@@ -83,8 +85,6 @@ Notice, no graphical representation appears because it is only available for two
 Additional constraints may be created with the **+** UI element at the bottom of the editable tableau. Additional variable columns can be created with the **Add Variable** button. 
 
 
-//TODO: show input, output, settings
+//TODO: LP MIT format and limitations
 
 //TODO: activity
-
-//TODO: LP MIT format and limitations
