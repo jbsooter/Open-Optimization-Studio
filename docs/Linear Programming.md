@@ -11,7 +11,7 @@ This module allows the user to:
 
 ### Formulating a Model
 
-Two methods are supplied for formulating a model. The first, [Tableau](Tableau) is implemented with streamlit's editable dataframe functionality, and is built around the traditional simplex tableau in mind. The second, [LP][LP], follows a modeling language created by MIT that closely follows mathematical notation for linear functions. 
+Two methods are supplied for formulating a model. The first, [Tableau](#tableau) is implemented with streamlit's editable dataframe functionality, and is built around the traditional simplex tableau in mind. The second, [LP][#lp], follows a modeling language created by MIT that closely follows mathematical notation for linear functions. 
 
 #### Tableau
 Consider the following linear program: 
@@ -84,6 +84,7 @@ Notice, no graphical representation appears because it is only available for two
 
 Additional constraints may be created with the **+** UI element at the bottom of the editable tableau. Additional variable columns can be created with the **Add Variable** button. 
 
+#### LP
 
 //TODO: LP MIT format and limitations
 
