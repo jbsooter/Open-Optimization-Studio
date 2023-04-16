@@ -188,8 +188,9 @@ def download_sol():
         st.session_state.last_solution.to_excel(
             writer, sheet_name="solution", index=False, engine='xlsxwriter')
         if st.session_state.lp_type == 'lp':
-            st.session_state.sensitivity_analysis.to_excel(
-                writer, sheet_name="sensitivity", index=False, engine='xlsxwriter')
+            if st.session_state.sensitivity_analysis is not None:
+                st.session_state.sensitivity_analysis.to_excel(
+                    writer, sheet_name="sensitivity", index=False, engine='xlsxwriter')
 
             # if a 2-var continous problem, save graphical solution to
             # worksheet
