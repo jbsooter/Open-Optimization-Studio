@@ -3,7 +3,6 @@ import re
 
 import streamlit as st
 import pandas as pd
-import streamlit_ace
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
 from ortools.model_builder.python import model_builder as mb
@@ -362,9 +361,9 @@ def solve_lp_file(lp_string):
     # https://github.com/google/or-tools/issues/523
     # https://web.mit.edu/lpsolve/doc/lp-format.htm
 
-    #declare modelBuilder and solver objects
+    #declare modelBuilder
     model = mb.ModelBuilder()
-    solver = mb.ModelSolver('CP-SAT')
+
 
     #Pre-OR-Tools Clean.
     # 1. Removes // style comments.
@@ -390,6 +389,13 @@ def solve_lp_file(lp_string):
     if model.num_variables == 0:
         st.error("LP Model Import Failed. Try Again. ")
         return
+
+    #determine linear or mip and create ModelSolver
+    solver = mb.ModelSolver(config.solver_backend['linear'])
+    variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    for x in variables:
+        if x.is_integral:
+            solver = mb.ModelSolver(config.solver_backend['mip'])
 
     # solve model
     status = solver.solve(model)
