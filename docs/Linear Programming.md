@@ -13,7 +13,7 @@ This module allows the user to:
 
 Two methods are supplied for formulating a model. The first, [Tableau](#tableau) is implemented with streamlit's editable dataframe functionality, and is built around the traditional simplex tableau in mind. The second, [LP](#lp), follows a modeling language created by MIT that closely follows mathematical notation for linear functions. 
 
-#### Tableau
+### Tableau
 Consider the following linear program: 
 
 max: $3x + 2y$
