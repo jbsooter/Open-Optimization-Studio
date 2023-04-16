@@ -462,7 +462,7 @@ def main():
     # setup sidebar
     # allow for File I/O
     with st.sidebar:
-        st.selectbox(label="Mode",options=['LP','Tableau'],index=0,key='model_mode_lp')
+        st.selectbox(label="Mode",options=['LP','Tableau'],index=1,key='model_mode_lp')
         if st.session_state.model_mode_lp == 'Tableau':
             st.header("Model Input/Output")
             st.file_uploader(
@@ -495,8 +495,6 @@ def main():
 
     #lp mit mode
     if st.session_state['model_mode_lp'] == 'LP':
-        st.write("experiment")
-
         lp_editor= st_ace("""max: 3x + 5y;
 
         c1: 2x + y <= 10;
