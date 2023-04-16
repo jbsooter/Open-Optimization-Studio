@@ -441,7 +441,7 @@ def main():
     # initialize session default data
     if 'df_mip' not in st.session_state:
         st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c', 2.0, 1.0, 1.0], dtype='string'), 'var2': pd.Series(
-            ['c', 1.0, 1.0, 0.0], dtype='string'), 'inequality': ["", "<=", "<=", "<="], 'RHS': pd.Series(['', 100.0, 80.0, 40.0])})
+            ['c', 1.0, 1.0, 0.0], dtype='string'), 'inequality': ["", "<=", "<=", "<="], 'RHS': pd.Series(['', 100.0, 80.0, 40.0],dtype='string')})
         st.session_state['input_mip'] = pd.DataFrame()
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj": "max", 'var1': pd.Series(
