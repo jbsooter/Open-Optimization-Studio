@@ -86,6 +86,59 @@ Additional constraints may be created with the **+** UI element at the bottom of
 
 ### LP
 
-//TODO: LP MIT format and limitations
+Alternatively, a model can be formulated in the LP language, which was created as a syntax for linear optimization by MIT. The LP syntax has the characteristics: 
 
-//TODO: activity
+- Every line is followed by a semicolon;
+- Inequalities are represented with the following symbols [<=, >=, <,>,=]
+- The objective function direction is represented with keywords **max** and **min** followed by a colon. 
+- constraints can be named by specifying a name followed by a colon ahead of the constraint expression. 
+- variables default to being continuous, but can be declared **int** (integer) or **bin** (binary). 
+- one line comments can be added with **//** and block comments are supported with **/\* \*/**
+
+The original model could be created as follows in the LP syntax: 
+
+```
+max: 3x + 2y;
+
+        c1: 2x + y <= 100;
+
+        c2: x + y <= 80;
+
+        c3: x  <= 40;
+
+        x >= 0;
+
+        y >= 0;
+```
+
+Unsurprisingly, the same optimal solution is found. 
+
+| obj |var1 | var2 |
+| --- | --- | --- |
+| 180 | 20 | 60 |
+
+To constrain x to binary values and y to integer values, the following variable declarations can be added:
+
+```
+max: 3x + 2y;
+
+        c1: 2x + y <= 100;
+
+        c2: x + y <= 80;
+
+        c3: x  <= 40;
+
+        x >= 0;
+
+        y >= 0;
+        
+        bin x;
+        
+        int y;
+
+```
+
+In the LP syntax, first the objective is declared, then the constraints, then variables are declared. If no declaration is made for a used variable, it is considered continuous. 
+
+For complete documentation of the LP syntax, see this [page](https://web.mit.edu/lpsolve/doc/lp-format.htm). 
+
