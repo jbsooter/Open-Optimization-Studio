@@ -202,16 +202,6 @@ def generate_time_blocks(I, K, a_k, p_k, r_i, d_i):
 
         # remove events that are not within the timeframe
         cal_df = st.session_state["calendar_df"]
-        cal_df = cal_df[
-            cal_df["begin"] >= datetime(
-                day=st.session_state["begin_horizon"].day,
-                month=st.session_state["begin_horizon"].month,
-                year=st.session_state["begin_horizon"].year,
-                tzinfo=tz)]
-        cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,
-                                                  month=st.session_state["end_horizon"].month,
-                                                  year=st.session_state["end_horizon"].year,
-                                                  tzinfo=tz)]
 
         # add calendar events to time block png
         for index, row in cal_df.iterrows():
@@ -230,6 +220,10 @@ def generate_time_blocks(I, K, a_k, p_k, r_i, d_i):
 
 
 def model_builder():
+    """
+    Converts the dataframe representation of the uploaded .ics calendar file to the discretized model parameters
+    required for generate_time_blocks(). Calls generate_time_blocks() to run optimization and output results.
+    """
     # retrieve calendar dataframe from session state
     cal_df = st.session_state["calendar_df"]
 
@@ -239,11 +233,11 @@ def model_builder():
     cal_df = cal_df[cal_df["begin"] >= datetime(day=st.session_state["begin_horizon"].day,
                                                 month=st.session_state["begin_horizon"].month,
                                                 year=st.session_state["begin_horizon"].year,
-                                                tzinfo=tz)]
+                                                tzinfo=tz)-timedelta(days=1)]
     cal_df = cal_df[cal_df["end"] <= datetime(day=st.session_state["end_horizon"].day,
                                               month=st.session_state["end_horizon"].month,
                                               year=st.session_state["end_horizon"].year,
-                                              tzinfo=tz)]
+                                              tzinfo=tz) + timedelta(days=1)] #+1 prevents cutoff of a day due to timezone adj, still truncated before calendar built
     # create event duration column
     cal_df["dur"] = cal_df["end"] - cal_df["begin"]
 
@@ -369,6 +363,11 @@ def model_builder():
 
 
 def import_calendar():
+    """
+    Imports all calendar events from the user's calendar for the forward-looking 365 days and formats
+    as a dataframe. This result is saved in session_state.
+    :return:
+    """
     if st.session_state.calendar_ics is None:
         # do not access buffer if this callback is the result of user deleting
         # upload file
@@ -378,7 +377,7 @@ def import_calendar():
     # comprehension
     cal = icalendar.Calendar.from_ical(
         StringIO(st.session_state["calendar_ics"].getvalue().decode("utf-8")).read())
-    # Date range is the forward looking year
+    # Date range is the forward looking year, get events that recurr
     events = recurring_ical_events.of(cal).between(
         datetime.today() -
         timedelta(
@@ -386,15 +385,21 @@ def import_calendar():
         datetime.today() +
         timedelta(
             days=365))
+
+
     events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
-    # write df to screen and save to session state
-    st.write(events_df)
+    events_df
     st.session_state["calendar_df"] = events_df
 
 
 def event_to_dict(event):
+    """
+    Helper method to convert return of recurring_ical_events to a pandas dataframe.
+    :param event:
+    :return:
+    """
     # https://www.youtube.com/watch?v=qRLkAZTc3GE
     return {
         'name': event["SUMMARY"],
@@ -404,6 +409,9 @@ def event_to_dict(event):
 
 
 def add_task():
+    """
+    Add another row for task entry to the UI.
+    """
     st.session_state["number_of_tasks"] = st.session_state["number_of_tasks"] + 1
 
 
