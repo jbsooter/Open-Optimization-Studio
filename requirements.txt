@@ -1,10 +1,9 @@
 streamlit
 ortools
-xlsxwriter
-openpyxl
 recurring-ical-events
 calendar-view
 matplotlib
 openrouteservice
 streamlit-folium
 folium
+streamlit-ace

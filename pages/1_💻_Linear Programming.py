@@ -1,9 +1,12 @@
 import io
+import re
 
 import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
+from ortools.model_builder.python import model_builder as mb
+from streamlit_ace import st_ace
 
 from utilities import config
 
@@ -144,93 +147,6 @@ def solution_printer(solver):
          c in enumerate(solver.constraints())]
     st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
 
-
-def download_mip():
-    # in memory location for excel file
-    buffer = io.BytesIO()
-
-    # used writer to write multiple df to same sheet
-    with pd.ExcelWriter(buffer) as writer:
-        st.session_state.df_obj.to_excel(
-            writer,
-            sheet_name="model",
-            index=False,
-            engine='xlsxwriter')
-        st.session_state.df_mip.to_excel(
-            writer,
-            sheet_name="model",
-            index=False,
-            startrow=4,
-            engine='xlsxwriter')
-        return buffer
-
-
-def download_sol():
-    # in memory location for excel file
-    buffer = io.BytesIO()
-
-    # used writer to write multiple df to same sheet
-    with pd.ExcelWriter(buffer) as writer:
-        st.session_state.df_obj.to_excel(
-            writer,
-            sheet_name="model",
-            index=False,
-            engine='xlsxwriter')
-        st.session_state.df_mip.to_excel(
-            writer,
-            sheet_name="model",
-            index=False,
-            startrow=4,
-            engine='xlsxwriter')
-        st.session_state.last_solution.to_excel(
-            writer, sheet_name="solution", index=False, engine='xlsxwriter')
-        if st.session_state.lp_type == 'lp':
-            st.session_state.sensitivity_analysis.to_excel(
-                writer, sheet_name="sensitivity", index=False, engine='xlsxwriter')
-
-            # if a 2-var continous problem, save graphical solution to
-            # worksheet
-            if two_var_graphical_solution() is not None:
-                pd.DataFrame().to_excel(
-                    writer,
-                    sheet_name="graphical",
-                    index=False,
-                    engine='xlsxwriter')
-                two_var_graphical_solution()
-                plt.savefig("images/graphical.png")
-                # writer.Workbook.add_worksheet('graphical')
-                writer.sheets['graphical'].insert_image(
-                    'A1', "images/graphical.png")
-        return buffer
-
-
-def upload_mip():
-    # get file from uploader
-    if st.session_state.model_up is None:
-        # do not access buffer if this callback is the result of user deleting
-        # upload file
-        return
-    else:
-        file_input = st.session_state.model_up
-        file_input_df = pd.read_excel(file_input, engine='openpyxl')
-
-    # get the objective table and convert to dataframe
-    df_obj = file_input_df.drop([x for x in range(1, len(file_input_df))])
-    df_obj.pop(df_obj.columns.values[-1])
-
-    # get the constraint table and convert to dataframe
-    df_mip = file_input_df.drop(x for x in range(0, 3))
-    df_mip.reset_index(drop=True, inplace=True)
-    df_mip.columns = df_mip.iloc[0]
-    df_mip = df_mip.drop(0)
-    # make sure index starts with 0
-    df_mip.reset_index(drop=True, inplace=True)
-
-    # reset project data
-    st.session_state.df_mip = df_mip
-    st.session_state.df_obj = df_obj
-
-
 def two_var_graphical_solution():
     # set color scheme
     color_defaults = config.two_var_color_defaults
@@ -354,15 +270,111 @@ def two_var_graphical_solution():
             # return no figure
             return None
 
+def solve_lp_file(lp_string):
+    # https://github.com/google/or-tools/issues/523
+    # https://web.mit.edu/lpsolve/doc/lp-format.htm
+
+    #declare modelBuilder
+    model = mb.ModelBuilder()
+
+
+    #Pre-OR-Tools Clean.
+    # 1. Removes // style comments.
+    # Assumes lp_string coming in as single string
+    # Split the input string by newline character
+    lines = lp_string.split("\n")
+
+    #remove comment from each line
+    for i in range(len(lines)):
+        if "//" in lines[i]:
+            lines[i] = lines[i].split("//")[0]
+
+    # rejoin strings to one and assign to lp_string
+    lp_string = "\n".join(lines)
+
+    #2. remove block comment \* *\
+    lp_string= re.sub(r'/\*.*?\*/','',lp_string)
+
+    #import LP format model from ace editor component
+    model.import_from_lp_string(lp_string=lp_string)
+
+    #verify that model imported successfully. If not, end method and show error message
+    if model.num_variables == 0:
+        st.error("LP Model Import Failed. Try Again. ")
+        return
+
+    #determine linear or mip and create ModelSolver
+    solver = mb.ModelSolver(config.solver_backend['linear'])
+    variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    for x in variables:
+        if x.is_integral:
+            solver = mb.ModelSolver(config.solver_backend['mip'])
+
+    #pply tl
+    solver.set_time_limit_in_seconds(st.session_state['time_limit'])
+    # solve model
+    status = solver.solve(model)
+
+    # update solution status. TOD:ckean up
+    st.session_state['solution_message'] = str(status)
+
+    # print out variable values to ensure working
+    # variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    # for x in variables:
+    #    st.write(x.name + ": " +  str(solver.value(x)))
+
+    # convert soluiton to df
+    # Create an empty dictionary to store the column names and values
+    solution = {}
+
+    # Add the objective value to the dictionary
+    solution["obj"] = solver.objective_value
+
+    # Loop through the variables and add their names and values to the dictionary
+    variables = [model.var_from_index(i) for i in range(model.num_variables)]
+    for x in variables:
+        solution[x.name] = solver.value(x)
+
+    st.session_state['lp_type'] = 'lp'
+    for x in variables:
+        if x.is_integral:
+            st.session_state['lp_type'] = 'mip'
+            st.session_state['sensitivity_analysis'] = None
+    # Convert the dictionary to a DataFrame
+    df = pd.DataFrame(solution, index=[0])
+
+    #update solution session state
+    st.session_state['last_solution'] = df
+
+    if st.session_state['lp_type'] == 'lp':
+        #solver.activity(model.cons)
+        #o = [{'Name': c.name(),
+        #  'Shadow Price': c.dual_value(),
+        #  'Slack': c.ub() - activities[i]} for i,
+        #                                       c in enumerate(solver.constraints())]
+        #todo produce this
+        st.session_state["sensitivity_analysis"] = None
+
+def clear_problem_ss():
+    #reset to original values
+    st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c', 2.0, 1.0, 1.0], dtype='string'), 'var2': pd.Series(
+        ['c', 1.0, 1.0, 0.0], dtype='string'), 'inequality': ["", "<=", "<=", "<="], 'RHS': pd.Series(['', 100.0, 80.0, 40.0],dtype='string')})
+    st.session_state['input_mip'] = pd.DataFrame()
+    st.session_state['df_obj'] = pd.DataFrame({"obj": "max", 'var1': pd.Series(
+        [3.0], dtype='double'), 'var2': pd.Series([2.0], dtype='double')})
+    st.session_state['input_obj'] = pd.DataFrame()
+
+    st.session_state['last_solution'] = None
 
 def main():
     st.set_page_config(layout="wide")
 
     st.title("Linear Programming")
+
     # initialize session default data
     if 'df_mip' not in st.session_state:
         st.session_state['df_mip'] = pd.DataFrame({'var1': pd.Series(['c', 2.0, 1.0, 1.0], dtype='string'), 'var2': pd.Series(
-            ['c', 1.0, 1.0, 0.0], dtype='string'), 'inequality': ["", "<=", "<=", "<="], 'RHS': pd.Series(['', 100.0, 80.0, 40.0])})
+            ['c', 1.0, 1.0, 0.0], dtype='string'), 'inequality': ["", "<=", "<=", "<="], 'RHS': pd.Series(['', 100.0, 80.0, 40.0],dtype='string')})
         st.session_state['input_mip'] = pd.DataFrame()
     if 'df_obj' not in st.session_state:
         st.session_state['df_obj'] = pd.DataFrame({"obj": "max", 'var1': pd.Series(
@@ -372,41 +384,41 @@ def main():
         st.session_state.solver_backend = None
     if 'lp_type' not in st.session_state:
         st.session_state.lp_type = None
+    if 'last_solution' not in st.session_state:
+        st.session_state['last_solution'] = None
+
+
     # setup sidebar
     # allow for File I/O
     with st.sidebar:
-        st.header("Model Input/Output")
-        st.file_uploader(
-            label="Upload an Excel Model",
-            type='.xlsx',
-            key="model_up",
-            on_change=upload_mip,
-            help="Import xlsx file containing model formulation")
-        st.download_button(
-            data=download_mip(),
-            label="Download Current Model",
-            file_name="model.xlsx",
-            help="Downloads formulation in xlsx format")
-        if 'last_solution' in st.session_state:
-            st.download_button(
-                data=download_sol(),
-                label="Download Model + Solution",
-                file_name="model-solution.xlsx",
-                help="Downloads formulation, solution, and sensitivity report in xlsx format")
+        st.selectbox(label="Mode",options=['LP','Tableau'],index=1,key='model_mode_lp',on_change=clear_problem_ss)
+
         st.header("Settings")
-        st.checkbox(
-            "Do not render model",
-            help="Improves performance for large models by hiding the editable dataframe. ",
-            key="hide_model")
-        st.checkbox(
-            "Do not render solution",
-            help="Improves performance for large solutions by hiding output dataframe",
-            key="hide_solution")
         st.number_input("Time Limit (s)", value=60, key="time_limit")
-    # main page
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        if st.session_state["hide_model"] is False:
+
+    #lp mit mode
+    if st.session_state['model_mode_lp'] == 'LP':
+        lp_editor= st_ace("""max: 3x + 2y;
+
+        c1: 2x + y <= 100;
+
+        c2: x + y <= 80;
+
+        c3: x  <= 40;
+
+        x >= 0;
+
+        y >= 0;""",
+                          language='text'
+                          ,auto_update=True)
+
+
+
+        st.button(label="Solve model",key="solvelpmodel",on_click=solve_lp_file,args=[''.join(lp_editor)])
+    elif st.session_state["model_mode_lp"] == 'Tableau':
+        # main page
+        col1, col2 = st.columns([6, 1])
+        with col1:
             # load obj grid, save input
             st.session_state['input_obj'] = st.experimental_data_editor(
                 st.session_state["df_obj"], num_rows="dynamic")
@@ -414,32 +426,35 @@ def main():
             st.session_state['input_mip'] = st.experimental_data_editor(
                 st.session_state["df_mip"], num_rows="dynamic")
 
-    with col2:
-        # adding white space. TODO: More elegant solution?
-        for x in range(0, 6):
-            st.write("")
+        with col2:
+            # adding white space. TODO: More elegant solution?
+            for x in range(0, 6):
+                st.write("")
 
-        # allow for additional variables
-        st.button(
-            label="Add Variable",
-            on_click=add_column,
-            help="Creates a new variable column")
+            # allow for additional variables
+            st.button(
+                label="Add Variable",
+                on_click=add_column,
+                help="Creates a new variable column")
 
-    st.button(label="Solve", on_click=solve_mip, help="Solves the model")
+        st.button(label="Solve", on_click=solve_mip, help="Solves the model")
 
-    if st.session_state['hide_solution'] is False:
-        if 'last_solution' in st.session_state:
-            st.write(st.session_state['solution_message'])
-            st.write(st.session_state['last_solution'])
+
+    if st.session_state['last_solution'] is not None:
+        st.write(st.session_state['solution_message'])
+        st.write(st.session_state['last_solution'])
         if st.session_state['lp_type'] is 'lp':
             if 'sensitivity_analysis' in st.session_state:
                 st.write("The sensitivity of the constraint set is as follows: ")
                 st.write(st.session_state['sensitivity_analysis'])
 
-    # determine if a graphical solution can be generated
-    figure = two_var_graphical_solution()
+        #TODO: Support Graphical with LP Format
+        if st.session_state['model_mode_lp'] == 'LP':
+            figure = None
+        else:
+            # determine if a graphical solution can be generated
+            figure = two_var_graphical_solution()
 
-    if st.session_state['hide_solution'] is False:
         # if a graphical solution generated, display it
         if figure is not None:
             st.write("Graphical Representation")
