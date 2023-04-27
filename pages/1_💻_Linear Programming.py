@@ -443,7 +443,7 @@ def main():
     if st.session_state['last_solution'] is not None:
         st.write(st.session_state['solution_message'])
         st.write(st.session_state['last_solution'])
-        if st.session_state['lp_type'] is 'lp':
+        if st.session_state['lp_type'] == 'lp':
             if 'sensitivity_analysis' in st.session_state:
                 st.write("The sensitivity of the constraint set is as follows: ")
                 st.write(st.session_state['sensitivity_analysis'])
