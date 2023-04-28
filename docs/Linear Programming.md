@@ -61,7 +61,7 @@ Need to double check math on this.
 | c2 | 1 | 0 |
 | c3 | 0 | 20 |
 -->
-[](/images/graphical-representation.png)
+![2 Variable Graphical Representation](images/graphical-representation.png)
 
 If I wanted to model var1 as a binary variable, I would simply change the type declaration in the first row of the Tableau: 
 

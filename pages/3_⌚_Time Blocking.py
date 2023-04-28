@@ -390,7 +390,6 @@ def import_calendar():
     events_dict = [event_to_dict(event) for event in events]
     events_df = pd.DataFrame(events_dict)
 
-    events_df
     st.session_state["calendar_df"] = events_df
 
 
@@ -417,6 +416,9 @@ def add_task():
 
 def main():
     st.set_page_config(layout="wide")
+
+    st.subheader("Time Blocking")
+
     # upload ics file
     st.file_uploader(
         "Upload Calendar",

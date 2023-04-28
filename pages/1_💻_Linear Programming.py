@@ -369,7 +369,7 @@ def clear_problem_ss():
 def main():
     st.set_page_config(layout="wide")
 
-    st.title("Linear Programming")
+    st.subheader("Linear Programming")
 
     # initialize session default data
     if 'df_mip' not in st.session_state:
@@ -417,7 +417,7 @@ def main():
         st.button(label="Solve model",key="solvelpmodel",on_click=solve_lp_file,args=[''.join(lp_editor)])
     elif st.session_state["model_mode_lp"] == 'Tableau':
         # main page
-        col1, col2 = st.columns([6, 1])
+        col1, col2 = st.columns([2,1])
         with col1:
             # load obj grid, save input
             st.session_state['input_obj'] = st.experimental_data_editor(
@@ -427,10 +427,6 @@ def main():
                 st.session_state["df_mip"], num_rows="dynamic")
 
         with col2:
-            # adding white space. TODO: More elegant solution?
-            for x in range(0, 6):
-                st.write("")
-
             # allow for additional variables
             st.button(
                 label="Add Variable",
