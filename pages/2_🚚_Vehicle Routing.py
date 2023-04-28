@@ -259,6 +259,8 @@ def rate_limited_generic_vrp(addresses):
 
 def main():
     st.subheader("Vehicle Routing")
+    with st.sidebar():
+        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Vehicle%20Routing)")
     # add session state location for addresses
     if 'input_addresses' not in st.session_state:
         st.session_state["input_addresses"] = pd.DataFrame()

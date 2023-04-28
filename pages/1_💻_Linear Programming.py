@@ -395,6 +395,8 @@ def main():
 
         st.header("Settings")
         st.number_input("Time Limit (s)", value=60, key="time_limit")
+        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Linear%20Programming)")
+        #todo add to others
 
     #lp mit mode
     if st.session_state['model_mode_lp'] == 'LP':
