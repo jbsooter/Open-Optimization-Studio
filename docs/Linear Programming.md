@@ -63,7 +63,7 @@ The sensitivity of the constraint set is as follows:
 
 The constraints, objective function, and feasible region can be shown graphically for two variable, continuous problems. 
 
-<img src="https://github.com/jbsooter/Open-Optimization-Studio/blob/a841be94cdd879aa809db139cfaf94891f614b26/images/lp_2var.png" width="150",height="150">)
+<img src="https://github.com/jbsooter/Open-Optimization-Studio/blob/a841be94cdd879aa809db139cfaf94891f614b26/images/lp_2var.png" width="150",height="150"/>)
 
 If I wanted to model var1 as a binary variable, I would simply change the type declaration in the first row of the Tableau: 
 
