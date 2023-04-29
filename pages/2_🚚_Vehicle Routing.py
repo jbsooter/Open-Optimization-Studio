@@ -58,13 +58,16 @@ def geocode_addresses(addresses):
     return coordinates
 
 
-def generic_vrp(addresses):
+def generic_vrp(addresses, depot_index):
+    '''
+    Implementation of standard capacitated VRP given a list of coordinate pairs and the depot index.
+    :param addresses: locations (coordinate pairs) [[lng,lat],[lng,lat]]
+    Solution values are stored in session state.
+    '''
     if 'vrp_solution' not in st.session_state:
         st.session_state['vrp_solution'] = {
             'text': None, 'map': None, 'improvement': None}
     nodes = geocode_addresses(addresses)
-    # identify depot
-    depot_index = 0
 
     # query cost matrix
     arc_cost_matrix = query_matrix(nodes=nodes)
@@ -184,7 +187,7 @@ def print_solution(addresses, nodes, manager, routing, solution):
     routes_all = []
     for vehicle_id in range(int(st.session_state["num_vehicles"])):
         index = routing.Start(vehicle_id)
-        plan_output = 'Route for vehicle {}: '.format(vehicle_id)
+        plan_output = '**Route for vehicle {}:**\n\n'.format(vehicle_id)
         route_distance = 0
         node_coordinates = []
         while not routing.IsEnd(index):
@@ -195,7 +198,7 @@ def print_solution(addresses, nodes, manager, routing, solution):
             else:  # set index in dict of artificial depot to 0
                 node_coordinates.append(
                     {'index': 0, 'coordinates': nodes[manager.IndexToNode(index)]})
-            plan_output += ' {} -> '.format(
+            plan_output += ' {} ️➡️\n'.format(
                 addresses[manager.IndexToNode(index)])
             previous_index = index
             index = solution.Value(routing.NextVar(index))
@@ -248,7 +251,7 @@ def print_solution(addresses, nodes, manager, routing, solution):
     st.session_state['vrp_solution']['routes'] = routes_all
 
 
-def rate_limited_generic_vrp(addresses):
+def rate_limited_generic_vrp(addresses, depot_index):
     '''
     Imposes the configured limit on the size of problem instance to avoid exhausting the API key inadvertently.
     :param addresses:
@@ -258,11 +261,14 @@ def rate_limited_generic_vrp(addresses):
         st.write(
             f"Your problem instance is larger than the maximum configured size of {config.vrp_opts['max_num_nodes']}")
     else:
-        generic_vrp(addresses)
+        generic_vrp(addresses, depot_index)
 
 def change_route_limit():
-
-    #Attempt to use personal api key, if it works set the config for server to personal remote
+    '''
+    Callback for addition of personal API key.
+    If a trial call with the new key fails, revert to default key.
+    Otherwise, accept the new key and remove the node limit.
+    '''
     try:
         directions(openrouteservice.Client(key=st.session_state["personal-ors-key"]),coordinates=[])
         config.vrp_opts["ors_server"] = "Default-Personal"
@@ -320,11 +326,12 @@ def main():
 
     # run address query
     st.button("Run Optimization", on_click=rate_limited_generic_vrp, args=[
-              (st.session_state["input_addresses"])["Address to Visit"]])
+              (st.session_state["input_addresses"])["Address to Visit"],
+        [i for i in range(len(st.session_state["input_addresses"]["depot"])) if st.session_state["input_addresses"]["depot"][i] != 0][0]]) #find first address marked as depot and report index
 
     if 'vrp_solution' in st.session_state:
         for x in st.session_state['vrp_solution']['text']:
-            st.write(x)
+            st.markdown(x)
 
         if st.session_state['vrp_solution']['map'] is not None:
             streamlit_folium.folium_static(
