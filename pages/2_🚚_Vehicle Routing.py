@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 
 from openrouteservice import distance_matrix
 from openrouteservice.directions import directions
+from openrouteservice.exceptions import ApiError
 from openrouteservice.geocode import pelias_search
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
@@ -18,6 +19,8 @@ from utilities import config
 client = None
 if config.vrp_opts["ors_server"] == "Default":
     client = openrouteservice.Client(key=st.secrets["ors_key"])
+elif config.vrp_opts["ors_server"] == "Default-Personal":
+    client = openrouteservice.Client(key=st.session_state["personal-ors-key"])
 else:
     client = openrouteservice.Client(
         key=st.secrets["ors_key"],
@@ -257,10 +260,24 @@ def rate_limited_generic_vrp(addresses):
     else:
         generic_vrp(addresses)
 
+def change_route_limit():
 
+    #Attempt to use personal api key, if it works set the config for server to personal remote
+    try:
+        directions(openrouteservice.Client(key=st.session_state["personal-ors-key"]),coordinates=[])
+        config.vrp_opts["ors_server"] = "Default-Personal"
+    except ApiError:
+        st.error("API Key is invalid. ")
+        return
+    #remove node limit
+    config.vrp_opts["max_num_nodes"] = 10000
 def main():
     st.subheader("Vehicle Routing")
+
     with st.sidebar:
+        st.text_input(key="personal-ors-key",label="Enter Personal ORS Key Here",
+                      help="If you would like to route more than 8 locations, obtain a personal openrouteservice key.  [(sign up)](https://openrouteservice.org/plans/)")
+        st.button("Add Key",on_click=change_route_limit)
         st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Vehicle%20Routing)")
     # add session state location for addresses
     if 'input_addresses' not in st.session_state:
