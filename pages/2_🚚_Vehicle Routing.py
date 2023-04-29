@@ -49,9 +49,9 @@ def geocode_addresses(addresses):
 
     coordinates = []
     for location in addresses:
-        result = pelias_search(client=client, text=location)
-        coordinates.append([result["bbox"][0], result["bbox"][1]])
-
+        result = pelias_search(client=client, text=location,country="USA")
+        #centroid of bounding box of result
+        coordinates.append([(result["bbox"][0] +result["bbox"][2])/2.0  ,(result["bbox"][1] + result["bbox"][3])/2.0])
     return coordinates
 
 
@@ -216,7 +216,8 @@ def print_solution(addresses, nodes, manager, routing, solution):
             client=client,
             coordinates=[
                 x["coordinates"] for x in node_coordinates],
-            profile=st.session_state["matrix_profile"])
+            profile=st.session_state["matrix_profile"],
+            radiuses=[1000])
 
         coords = decode_polyline(route["routes"][0]["geometry"], False)
         # add the nodes
