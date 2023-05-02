@@ -7,3 +7,5 @@ openrouteservice
 streamlit-folium
 folium
 streamlit-ace
+osmnx
+scikit-learn

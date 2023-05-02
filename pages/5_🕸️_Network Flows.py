@@ -1,27 +1,23 @@
-import matplotlib.pyplot as plt
-import networkx as nx
 import osmnx as osmnx
-import streamlit
 import streamlit as st
 import streamlit_folium
 from ortools.graph.python import min_cost_flow
-from streamlit_folium import st_folium
 
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"] = osmnx.graph_from_address(address, dist=100, dist_type='bbox',network_type="walk",
+    st.session_state["running_graph"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="walk",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,
                                                              clean_periphery=True)
 
 def cost_function(highway,landuse,maxspeed):
     cost = 10
-    #if highway not in [ "motorway","primary","service"]:
-    #    cost = cost -1
+    if highway not in [ "motorway","primary","service"]:
+        cost = cost -1
     if landuse in ["university"]:
         cost = cost - 5
-    #if int(maxspeed[:2]) < 30:
-    #    cost = cost - 3
+    if int(maxspeed[:2]) < 30:
+        cost = cost - 3
     return cost
 
 
@@ -37,8 +33,6 @@ def main():
     address = st.text_input(label="Start Location")
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])
-
-
 
     #solve
     run_mincostflow = min_cost_flow.SimpleMinCostFlow()
@@ -85,8 +79,9 @@ def main():
         run_mincostflow.set_node_supply(j_iter,0)
 
     # set source and sink
-    run_mincostflow.set_node_supply(1,1)
-    run_mincostflow.set_node_supply(400,-1)
+
+    run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],osmnx.geocode(address)[0],osmnx.geocode(address)[1])),1)
+    run_mincostflow.set_node_supply(i-1,-1) #far away place
 
     # Run the min cost flow algorithm
     #st.write(run_mincostflow.solve())
@@ -103,22 +98,13 @@ def main():
 
             if flow > 0:
                 st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
-                st.write(i_u.get(u))
-                st.write(i_u.get(v))
                 nodes_ij.append(i_u.get(u))
                 nodes_ij.append(i_u.get(v))
 
-
-
-        #st.write(nodes_ij)
         sub = st.session_state["running_graph"].subgraph(nodes_ij)
-        st.write(sub.edges)
-        #sub.add_edges_from(nodes_ij)
 
         streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))
         streamlit_folium.folium_static(osmnx.plot_graph_folium(st.session_state["running_graph"]))
-
-
 
     else:
         print('There was an error with the min cost flow problem')
