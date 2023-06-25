@@ -133,3 +133,5 @@ dmypy.json
 .streamlit/secrets.toml
 
 images/
+
+cache/

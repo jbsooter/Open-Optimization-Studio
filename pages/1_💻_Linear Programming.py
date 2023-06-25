@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
-from ortools.model_builder.python import model_builder as mb
+from ortools.linear_solver.python import model_builder as mb
 from streamlit_ace import st_ace
 
 from utilities import config
@@ -369,7 +369,7 @@ def clear_problem_ss():
 def main():
     st.set_page_config(layout="wide")
 
-    st.title("Linear Programming")
+    st.subheader("Linear Programming")
 
     # initialize session default data
     if 'df_mip' not in st.session_state:
@@ -395,6 +395,8 @@ def main():
 
         st.header("Settings")
         st.number_input("Time Limit (s)", value=60, key="time_limit")
+        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Linear%20Programming)")
+        #todo add to others
 
     #lp mit mode
     if st.session_state['model_mode_lp'] == 'LP':
@@ -417,7 +419,7 @@ def main():
         st.button(label="Solve model",key="solvelpmodel",on_click=solve_lp_file,args=[''.join(lp_editor)])
     elif st.session_state["model_mode_lp"] == 'Tableau':
         # main page
-        col1, col2 = st.columns([6, 1])
+        col1, col2 = st.columns([2,1])
         with col1:
             # load obj grid, save input
             st.session_state['input_obj'] = st.experimental_data_editor(
@@ -427,10 +429,6 @@ def main():
                 st.session_state["df_mip"], num_rows="dynamic")
 
         with col2:
-            # adding white space. TODO: More elegant solution?
-            for x in range(0, 6):
-                st.write("")
-
             # allow for additional variables
             st.button(
                 label="Add Variable",

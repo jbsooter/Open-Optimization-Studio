@@ -53,15 +53,17 @@ An optimal solution was found in 0.001 s.
 | --- | --- | --- |
 | 180 | 20 | 60 |
 
-<!--- The sensitivity of the constraint set is as follows:
-Need to double check math on this. 
+The sensitivity of the constraint set is as follows:
+ 
 | Name |Shadow Price | Slack |
 | --- | --- | --- |
 | c1 | 1 | 0 |
 | c2 | 1 | 0 |
 | c3 | 0 | 20 |
--->
-[](/images/graphical-representation.png)
+
+The constraints, objective function, and feasible region can be shown graphically for two variable, continuous problems. 
+
+<img src="https://github.com/jbsooter/Open-Optimization-Studio/blob/a841be94cdd879aa809db139cfaf94891f614b26/images/lp_2var.png" width="400" >
 
 If I wanted to model var1 as a binary variable, I would simply change the type declaration in the first row of the Tableau: 
 
