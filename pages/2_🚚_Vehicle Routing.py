@@ -52,7 +52,7 @@ def geocode_addresses(addresses):
 
     coordinates = []
     for location in addresses:
-        result = pelias_search(client=client, text=location,country="USA")
+        result = pelias_search(client=client, text=location,country="USA",boundary.gid=st.session_state["geocoding_region"])
         #centroid of bounding box of result
         coordinates.append([(result["bbox"][0] +result["bbox"][2])/2.0  ,(result["bbox"][1] + result["bbox"][3])/2.0])
     return coordinates
@@ -308,6 +308,8 @@ def main():
     # select vehicle capacity
     st.number_input("Vehicle Order Capacity", key="vehicle_capacity",value=3,step=1)
 
+    # constrain geocoding region
+    st.text_input("Region",key="geocoding_region")
     # input addresses
     st.session_state.addresses_df = pd.DataFrame(
         {
