@@ -40,7 +40,7 @@ def main():
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])
 
-    if st.session_state['running_graph'] not None:
+    if st.session_state['running_graph'] != None:
         #solve
         run_mincostflow = min_cost_flow.SimpleMinCostFlow()
         # Define the cost and capacity for each edge
