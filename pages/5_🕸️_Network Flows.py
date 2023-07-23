@@ -6,7 +6,7 @@ from ortools.graph.python import min_cost_flow
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="all",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609, dist_type='bbox',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
     st.write(st.session_state["address_coords"])
@@ -37,6 +37,8 @@ def main():
     osmnx.config(useful_tags_way=["highway","maxspeed","surface","access","amenity"])
     #get address and graph
     address = st.text_input(label="Start Location")
+
+    st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])
 
