@@ -71,7 +71,7 @@ def main():
         lu = None
         ms = "100"
         if "amenity" in data:
-            st.write("hit")
+            #st.write("hit")
             lu = data["amenity"]
         if "maxspeed" in data:
             ms = data["maxspeed"]
@@ -102,14 +102,14 @@ def main():
             cost = run_mincostflow.unit_cost(w)
 
             if flow > 0:
-                st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
+                #st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
                 nodes_ij.append(i_u.get(u))
                 nodes_ij.append(i_u.get(v))
 
         sub = st.session_state["running_graph"].subgraph(nodes_ij)
 
         streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))
-        streamlit_folium.folium_static(osmnx.plot_graph_folium(st.session_state["running_graph"]))
+        st.write(f'Total Distance {2*sum(sub.edges[edge]['length'] for edge in sub.edges())}')
 
     else:
         print('There was an error with the min cost flow problem')
