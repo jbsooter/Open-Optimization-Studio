@@ -9,7 +9,6 @@ def build_graph(address):
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609, dist_type='network',network_type="walk",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
-    st.write(st.session_state["address_coords"])
 def cost_function(highway,landuse,maxspeed):
     cost = 10
     if highway not in [ "motorway","primary","service"]:
@@ -97,7 +96,7 @@ def main():
         if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
             # Print the total cost and flow on each edge
             total_cost = run_mincostflow.optimal_cost()
-            st.write(total_cost)
+            #st.write(total_cost)
             nodes_ij = []
             for w in range(run_mincostflow.num_arcs()):
                 u = run_mincostflow.tail(w)
