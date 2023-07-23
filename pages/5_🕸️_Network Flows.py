@@ -7,7 +7,7 @@ from ortools.graph.python import min_cost_flow
 def build_graph(address):
     # query osm
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="walk",
-                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,
+                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
 
 def cost_function(highway,landuse,maxspeed):
