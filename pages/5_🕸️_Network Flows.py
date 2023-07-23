@@ -109,7 +109,7 @@ def main():
         sub = st.session_state["running_graph"].subgraph(nodes_ij)
 
         streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))
-        st.write(f'Total Distance {2*sum(sub.edges[edge]['length'] for edge in sub.edges())}')
+        st.write(f'Total Distance {2*sum(sub.edges[edge]["length"] for edge in sub.edges())}')
 
     else:
         print('There was an error with the min cost flow problem')
