@@ -6,7 +6,7 @@ from ortools.graph.python import min_cost_flow
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="walk",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="walk",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,
                                                              clean_periphery=True)
 
@@ -25,6 +25,11 @@ def main():
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
         st.session_state['running_graph'] = None
+
+
+    if 'address_coords' not in st.session_state:
+        st.session_state['address_coords'] = None
+
     st.subheader("Network Flows")
 
     #useful tag config
@@ -80,7 +85,7 @@ def main():
 
     # set source and sink
 
-    run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],osmnx.geocode(address)[0],osmnx.geocode(address)[1])),1)
+    run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][0],st.session_state["address_coords"][1])),1)
     run_mincostflow.set_node_supply(i-1,-1) #far away place
 
     # Run the min cost flow algorithm
