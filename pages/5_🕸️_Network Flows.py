@@ -9,7 +9,7 @@ def build_graph(address):
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=3000, dist_type='bbox',network_type="walk",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
-    st.session_state["running_graph"] = osmnx.project_graph(st.session_state["running_graph"])
+    st.session_state["running_graph"] = osmnx.projection.project_graph(st.session_state["running_graph"])
 def cost_function(highway,landuse,maxspeed):
     cost = 10
     if highway not in [ "motorway","primary","service"]:
