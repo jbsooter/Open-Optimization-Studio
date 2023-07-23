@@ -109,6 +109,8 @@ def main():
         sub = st.session_state["running_graph"].subgraph(nodes_ij)
 
         streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))
+
+        total_length = 0
         for u, v, key, edge_data in sub.edges(keys=True, data=True):
             total_length += edge_data['length']
 
