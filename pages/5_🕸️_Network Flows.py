@@ -85,7 +85,7 @@ def main():
 
     # set source and sink
 
-    run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][0],st.session_state["address_coords"][1])),1)
+    run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])),1)
     run_mincostflow.set_node_supply(i-1,-1) #far away place
 
     # Run the min cost flow algorithm
