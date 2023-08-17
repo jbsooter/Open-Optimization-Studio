@@ -1,3 +1,5 @@
+import random
+
 import osmnx as osmnx
 import streamlit as st
 import streamlit_folium
@@ -5,23 +7,31 @@ from io import BytesIO
 from ortools.graph.python import min_cost_flow
 
 #useful tag config
-osmnx.config(useful_tags_way=["highway","maxspeed","surface","access","amenity"])
+osmnx.settings.useful_tags_node=["highway","maxspeed","surface","access","amenity"]
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609, dist_type='network',network_type="walk",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="walk",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
+
+    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="walk",
+                                                                                                     simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
+                                                                                                     clean_periphery=True)
 def cost_function(highway,landuse,maxspeed):
     cost = 10
-    if highway not in [ "motorway","primary","service"]:
-        cost = cost -1
+    if highway in [ "motorway","primary","service"]:
+        cost = cost +100
+    if highway in ["path"]:
+        cost = cost - 5
     if landuse in ["university"]:
         cost = cost - 5
+    if landuse is not None:
+        st.write(landuse)
     if int(maxspeed[:2]) < 30:
         cost = cost - 3
+    #st.write(cost)
     return cost
-
 
 def main():
     #initialize locaiton in session state
@@ -34,9 +44,6 @@ def main():
 
     st.subheader("Network Flows")
 
-    
-    #useful tag config
-    osmnx.config(useful_tags_way=["highway","maxspeed","surface","access","amenity"])
     #get address and graph
     address = st.text_input(label="Start Location")
 
@@ -92,7 +99,8 @@ def main():
         # set source and sink
 
         run_mincostflow.set_node_supply( u_i.get(osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])),1)
-        run_mincostflow.set_node_supply(i-1,-1) #far away place
+        result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
+        run_mincostflow.set_node_supply(u_i.get(random.choice(result)),-1) #far away place
 
         # Run the min cost flow algorithm
         #st.write(run_mincostflow.solve())
