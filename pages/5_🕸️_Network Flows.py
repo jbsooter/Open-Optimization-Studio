@@ -1,8 +1,11 @@
 import osmnx as osmnx
 import streamlit as st
 import streamlit_folium
+from io import BytesIO
 from ortools.graph.python import min_cost_flow
 
+#useful tag config
+osmnx.config(useful_tags_way=["highway","maxspeed","surface","access","amenity"])
 
 def build_graph(address):
     # query osm
@@ -118,6 +121,11 @@ def main():
                 total_length += edge_data['length']
     
             st.write(f'Total Distance Out and Back: { total_length/1609}') #meter to mile conversion
+
+            #GPX Download
+            file_mem = BytesIO()
+            osmnx.utils_graph.graph_to_gdfs(sub)[0].reset_index()["geometry"].to_file(file_mem,'GPX')
+            st.download_button(label='download',file_name="Route.gpx",mime="application/gpx+xml",data=file_mem)
     
         else:
             print('There was an error with the min cost flow problem')
