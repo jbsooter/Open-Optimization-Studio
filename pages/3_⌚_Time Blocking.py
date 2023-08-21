@@ -1,3 +1,4 @@
+import csv
 from datetime import datetime, timedelta
 from io import StringIO
 from math import trunc
@@ -9,6 +10,8 @@ import streamlit as st
 from calendar_view.calendar import Calendar
 from calendar_view.config.style import image_font
 from calendar_view.core.config import CalendarConfig
+from kiota_abstractions import request_adapter
+from msgraph import GraphServiceClient
 from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
@@ -361,10 +364,46 @@ def model_builder():
         r_i,
         d_i)
 
+def import_outlook_calendar():
+    """
+Imports all calendar events from the user's Outlook calendar for the forward-looking 365 days and formats
+as a dataframe. This result is saved in session_state.
+:return:
+"""
+    if st.session_state.calendar_csv is None:
+        # do not access buffer if this callback is the result of user deleting
+        # upload file
+        return
 
+    # read csv as dataframe
+    df = pd.read_csv(st.session_state["calendar_csv"],quoting=csv.QUOTE_ALL)
+
+    #calendar object
+    cal = icalendar.Calendar()
+    for i,x in df.iterrows():
+        event = icalendar.Event()
+        event["dtstart"] = icalendar.vDatetime(pd.to_datetime(x["Start Date"] + " " +  x["Start Time"]))
+        st.write(event["dtstart"])
+        event["dtend"] = icalendar.vDatetime(pd.to_datetime(x["End Date"]+ " " +x["End Time"]))
+        event["summary"] =x["Subject"]
+
+        cal.add_component(event)
+
+    events = recurring_ical_events.of(cal).between(
+        datetime.today() -
+        timedelta(
+            days=1),
+        datetime.today() +
+        timedelta(
+            days=365))
+
+
+    events_dict = [event_to_dict(event) for event in events]
+    events_df = pd.DataFrame(events_dict)
+    st.session_state["calendar_df"] = events_df
 def import_calendar():
     """
-    Imports all calendar events from the user's calendar for the forward-looking 365 days and formats
+    Imports all calendar events from the user's .ics format calendar for the forward-looking 365 days and formats
     as a dataframe. This result is saved in session_state.
     :return:
     """
@@ -428,6 +467,11 @@ def main():
         key='calendar_ics',
         on_change=import_calendar)
 
+    st.file_uploader(
+        "Upload Outlook Calendar",
+        type=".csv",
+        key='calendar_csv',
+        on_change=import_outlook_calendar)
     # input planning horizon
     st.date_input("Start", value=datetime.today(), help="Planning Horizon is inclusive of this date", key="begin_horizon")
     st.date_input(
