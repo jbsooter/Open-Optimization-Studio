@@ -10,14 +10,11 @@ import streamlit as st
 from calendar_view.calendar import Calendar
 from calendar_view.config.style import image_font
 from calendar_view.core.config import CalendarConfig
-from kiota_abstractions import request_adapter
-from msgraph import GraphServiceClient
 from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
 from utilities import utility_functions
 from utilities import config
-
 
 def generate_time_blocks(I, K, a_k, p_k, r_i, d_i):
     """

@@ -7,30 +7,38 @@ from io import BytesIO
 from ortools.graph.python import min_cost_flow
 
 #useful tag config
-osmnx.settings.useful_tags_node=["highway","maxspeed","surface","access","amenity"]
-
+osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'name',
+                                 'highway', 'maxspeed', 'service', 'access', 'area',
+                                 'landuse', 'width', 'est_width', 'junction', 'surface','length','foot']
+osmnx.settings.useful_tags_node = ['name','lit','amenity']
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="walk",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
 
-    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="walk",
+    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                                                                      clean_periphery=True)
-def cost_function(highway,landuse,maxspeed):
+def cost_function(way,start_node,end_node):
     cost = 10
-    if highway in [ "motorway","primary","service"]:
-        cost = cost +100
-    if highway in ["path"]:
-        cost = cost - 5
-    if landuse in ["university"]:
-        cost = cost - 5
-    if landuse is not None:
-        st.write(landuse)
-    if int(maxspeed[:2]) < 30:
-        cost = cost - 3
-    #st.write(cost)
+    if "length" in way:
+        if int(way["length"]) < 500:
+            cost = cost + 1
+
+    if "maxspeed" in way:
+        if int(way["maxspeed"][:2]) < 30:
+            cost = cost - 3
+
+    if "highway" in way:
+        if way["highway"] in [ "motorway","primary","service","residential","tertiary","service","primary_link","motorway"]:
+            cost = cost +100
+        if way["highway"]  in ["cycleway"]:
+            cost = cost - 1
+
+    if "foot" in way:
+        if way["foot"] not in ["designated"]:
+            cost = cost + 1000
     return cost
 
 def main():
@@ -80,7 +88,8 @@ def main():
                 i += 1
 
             #define cost
-            #    st.write(data)
+            #st.write(data)
+            #st.write(st.session_state["running_graph"].nodes(data=True)[u])
             lu = None
             ms = "100"
             if "amenity" in data:
@@ -88,7 +97,7 @@ def main():
                 lu = data["amenity"]
             if "maxspeed" in data:
                 ms = data["maxspeed"]
-            cost = cost_function(data['highway'],lu,ms)  # or any other cost function
+            cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[u])  # or any other cost function
             capacity = 1  # arc only used once
 
             #add arc info and set supply 0
