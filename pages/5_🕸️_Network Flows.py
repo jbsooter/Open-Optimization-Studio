@@ -1,16 +1,42 @@
 import random
 
+import openrouteservice
 import osmnx as osmnx
 import streamlit as st
 import streamlit_folium
 from io import BytesIO
+from openrouteservice import geocode
+
+import streamlit_searchbox
 from ortools.graph.python import min_cost_flow
+
+from utilities import config
 
 #useful tag config
 osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'name',
                                  'highway', 'maxspeed', 'service', 'access', 'area',
                                  'landuse', 'width', 'est_width', 'junction', 'surface','length','foot']
+
 osmnx.settings.useful_tags_node = ['name','lit','amenity']
+
+
+#retrieve client
+# ORS client to be shared among all methods
+client = None
+if config.vrp_opts["ors_server"] == "Default":
+    client = openrouteservice.Client(key=st.secrets["ors_key"])
+elif config.vrp_opts["ors_server"] == "Default-Personal":
+    client = openrouteservice.Client(key=st.session_state["personal-ors-key"])
+else:
+    client = openrouteservice.Client(
+        key=st.secrets["ors_key"],
+        base_url=config.vrp_opts["ors_server"])
+
+
+@st.cache_data(ttl= 1)
+def pelias_autocomplete(searchterm: str) -> list[any]:
+    #https://github.com/pelias/documentation/blob/master/autocomplete.md
+    return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
 def build_graph(address):
     # query osm
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
@@ -60,8 +86,9 @@ def main():
     st.subheader("Network Flows")
 
     #get address and graph
-    address = st.text_input(label="Start Location")
+    #address = st.text_input(label="Start Location")
 
+    address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete, key="sl")
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])

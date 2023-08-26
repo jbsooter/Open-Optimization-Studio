@@ -8,3 +8,5 @@ streamlit-folium
 folium
 osmnx
 scikit-learn
+streamlit-ace
+streamlit-searchbox
