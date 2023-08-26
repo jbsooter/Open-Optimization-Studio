@@ -1,8 +1,9 @@
 import re
-
+import numpy as np
 import streamlit as st
 import pandas as pd
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, cm
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver.python import model_builder as mb
 from streamlit_ace import st_ace
@@ -145,6 +146,57 @@ def solution_printer(solver):
          c in enumerate(solver.constraints())]
     st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
 
+def three_var_graphical_solution():
+    if len(st.session_state["df_mip"].columns) - 2 == 3:
+        #get constraints
+        df = st.session_state["df_mip"]
+        #assign coeffs and rhs to column variables
+        a = np.array(df["var1"][1:].astype(float))
+        b = np.array(df["var2"][1:].astype(float))
+        c = np.array(df["var3"][1:].astype(float))
+        d = np.array(df["RHS"][1:].astype(float))
+
+        #create matplotlib objects
+        fig = plt.figure()
+        ax = fig.add_subplot(111,projection='3d')
+
+        #find zeros (vertices)
+        vert = []
+        for i in range(0,len(a)):
+            vert.append([d[i]/a[i],0,0])
+            vert.append([0,d[i]/b[i],0])
+            vert.append([0,0,d[i]/c[i]])
+
+
+        #plot vertices
+        ax.add_collection3d(Poly3DCollection([vert],facecolors='cyan',edgecolors='black',alpha=0.3))
+
+        #label axes
+        ax.set_xlabel("X")
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        #find limits assuming all decision variables > 0
+        x_max = [x[0] for x in vert]
+        x_max = max(x_max)
+
+        y_max = [x[1] for x in vert]
+        y_max = max(y_max)
+
+        z_max = [x[2] for x in vert]
+        z_max = max(z_max)
+
+
+        #set limits
+        plt.xlim(0,x_max)
+        plt.ylim(0,y_max)
+        ax.set_zlim3d(0,z_max)
+
+        #plot
+        return fig
+    else:
+        return None
+
 def two_var_graphical_solution():
     # set color scheme
     color_defaults = config.two_var_color_defaults
@@ -168,7 +220,7 @@ def two_var_graphical_solution():
 
             # for every row in df that represents a constraint
             for i in range(1, len(df)):
-                # try to produce x and y intercepts of constraints at equality
+                # produce x and y intercepts of constraints at equality
                 try:
                     ci_var1, ci_var2 = [float(df[df.columns[-1]][i]) / float(df[df.columns[0]][i]), 0], \
                         [0, float(df[df.columns[-1]][i]) / float(df[df.columns[1]][i])]
@@ -440,11 +492,16 @@ def main():
             # determine if a graphical solution can be generated
             figure = two_var_graphical_solution()
 
+            if figure is None:
+                figure = three_var_graphical_solution()
+
+
         # if a graphical solution generated, display it
         if figure is not None:
             st.write("Graphical Representation")
             col1, col2 = st.columns([3, 2])
             col1.pyplot(figure)
+
 
 
 if __name__ == "__main__":
