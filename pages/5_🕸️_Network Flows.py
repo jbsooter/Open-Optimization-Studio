@@ -22,23 +22,30 @@ def build_graph(address):
                                                                                                      clean_periphery=True)
 def cost_function(way,start_node,end_node):
     cost = 10
+
+    #if length is less than 500 metres, penalize to reduce tons of turns
     if "length" in way:
         if int(way["length"]) < 500:
             cost = cost + 1
-
+    #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < 30:
             cost = cost - 3
+        if int(way["maxspeed"][:2]) > 60:
+            cost = cost + 10
 
+    #avoid raods
     if "highway" in way:
         if way["highway"] in [ "motorway","primary","service","residential","tertiary","service","primary_link","motorway"]:
             cost = cost +100
+        #prefer cycleways
         if way["highway"]  in ["cycleway"]:
             cost = cost - 1
-
+    #make expensive if not designated foot
     if "foot" in way:
         if way["foot"] not in ["designated"]:
             cost = cost + 1000
+
     return cost
 
 def main():
