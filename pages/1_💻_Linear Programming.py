@@ -1,4 +1,3 @@
-import io
 import re
 
 import streamlit as st
@@ -23,7 +22,6 @@ def add_column():
     st.session_state['df_mip'].insert(
         ncols - 2, f"var{ncols-1}", ['0'] * nrows)
     st.session_state['df_obj'][f"var{ncols-1}"] = [0]
-
 
 def solve_mip():
     # grab any modifications from data input
@@ -422,10 +420,10 @@ def main():
         col1, col2 = st.columns([2,1])
         with col1:
             # load obj grid, save input
-            st.session_state['input_obj'] = st.experimental_data_editor(
+            st.session_state['input_obj'] = st.data_editor(
                 st.session_state["df_obj"], num_rows="dynamic")
             # load input grid, save input
-            st.session_state['input_mip'] = st.experimental_data_editor(
+            st.session_state['input_mip'] = st.data_editor(
                 st.session_state["df_mip"], num_rows="dynamic")
 
         with col2:

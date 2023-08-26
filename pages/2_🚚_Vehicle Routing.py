@@ -321,7 +321,7 @@ def main():
                 True,
                 False,
                 False]})
-    st.session_state["input_addresses"] = st.experimental_data_editor(
+    st.session_state["input_addresses"] = st.data_editor(
         data=st.session_state["addresses_df"],
         num_rows="dynamic",
         key="edited_addresses_df")
