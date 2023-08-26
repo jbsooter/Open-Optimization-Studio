@@ -105,15 +105,6 @@ def build_route():
             i += 1
 
         #define cost
-        #st.write(data)
-        #st.write(st.session_state["running_graph"].nodes(data=True)[u])
-        lu = None
-        ms = "100"
-        if "amenity" in data:
-            #st.write("hit")
-            lu = data["amenity"]
-        if "maxspeed" in data:
-            ms = data["maxspeed"]
         cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[u])  # or any other cost function
         capacity = 1  # arc only used once
 
@@ -123,7 +114,6 @@ def build_route():
         run_mincostflow.set_node_supply(j_iter,0)
 
     # set source and sink
-
     source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
     run_mincostflow.set_node_supply( u_i.get(source_return),1)
     result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
@@ -131,11 +121,9 @@ def build_route():
     run_mincostflow.set_node_supply(u_i.get(sink_return),-1) #far away place
 
     # Run the min cost flow algorithm
-    #st.write(run_mincostflow.solve())
     if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
         # Print the total cost and flow on each edge
         total_cost = run_mincostflow.optimal_cost()
-        #st.write(total_cost)
         nodes_ij = []
         for w in range(run_mincostflow.num_arcs()):
             u = run_mincostflow.tail(w)
@@ -164,8 +152,6 @@ def main():
 
     st.subheader("Network Flows")
 
-
-
     address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete, key="sl")
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
@@ -176,7 +162,6 @@ def main():
     sink = None
     if st.session_state["running_graph"] is not None:
         sub,source, sink = build_route()
-
 
     if sub is not None:
         streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))

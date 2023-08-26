@@ -275,7 +275,6 @@ def solve_lp_file(lp_string):
     #declare modelBuilder
     model = mb.ModelBuilder()
 
-
     #Pre-OR-Tools Clean.
     # 1. Removes // style comments.
     # Assumes lp_string coming in as single string
@@ -316,11 +315,6 @@ def solve_lp_file(lp_string):
     # update solution status. TOD:ckean up
     st.session_state['solution_message'] = str(status)
 
-    # print out variable values to ensure working
-    # variables = [model.var_from_index(i) for i in range(model.num_variables)]
-    # for x in variables:
-    #    st.write(x.name + ": " +  str(solver.value(x)))
-
     # convert soluiton to df
     # Create an empty dictionary to store the column names and values
     solution = {}
@@ -345,11 +339,6 @@ def solve_lp_file(lp_string):
     st.session_state['last_solution'] = df
 
     if st.session_state['lp_type'] == 'lp':
-        #solver.activity(model.cons)
-        #o = [{'Name': c.name(),
-        #  'Shadow Price': c.dual_value(),
-        #  'Slack': c.ub() - activities[i]} for i,
-        #                                       c in enumerate(solver.constraints())]
         #todo produce this
         st.session_state["sensitivity_analysis"] = None
 

@@ -135,7 +135,6 @@ def generic_vrp(addresses, depot_index):
     solution = routing.SolveWithParameters(search_parameters)
     # Print solution on console.
     if solution:
-        # for i in range(1,all_solutions.SolutionCount()): #1 to skip repeat
         # initial
         st.write(all_solutions.ObjectiveValue(
             all_solutions.SolutionCount() - 1))
