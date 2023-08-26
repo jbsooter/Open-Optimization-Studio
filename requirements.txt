@@ -1,12 +1,12 @@
 streamlit
+streamlit-ace
+streamlit-searchbox
+streamlit-folium
+folium
 ortools
+scikit-learn
 recurring-ical-events
 calendar-view
 matplotlib
 openrouteservice
-streamlit-folium
-folium
 osmnx
-scikit-learn
-streamlit-ace
-streamlit-searchbox
