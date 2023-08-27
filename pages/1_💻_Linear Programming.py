@@ -1,4 +1,6 @@
 import re
+
+import mpld3 as mpld3
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -6,6 +8,9 @@ from matplotlib import pyplot as plt, cm
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver.python import model_builder as mb
+import  streamlit.components.v1 as components
+from scipy.spatial import ConvexHull
+
 from streamlit_ace import st_ace
 
 from utilities import config
@@ -146,7 +151,13 @@ def solution_printer(solver):
          c in enumerate(solver.constraints())]
     st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
 
+
+class Arrow3D:
+    pass
+
+
 def three_var_graphical_solution():
+    #https://demonstrations.wolfram.com/GraphicalLinearProgrammingForThreeVariables/
     if len(st.session_state["df_mip"].columns) - 2 == 3:
         #get constraints
         df = st.session_state["df_mip"]
@@ -163,19 +174,23 @@ def three_var_graphical_solution():
         #find zeros (vertices)
         vert = []
         for i in range(0,len(a)):
-            vert.append([d[i]/a[i],0,0])
-            vert.append([0,d[i]/b[i],0])
-            vert.append([0,0,d[i]/c[i]])
+            vert.append([min(100000,d[i]/a[i]),0,0])
+            vert.append([0,min(100000,d[i]/b[i]),0])
+            vert.append([0,0,min(100000,d[i]/c[i])])
 
+        vert.append([0,0,0])
 
-        #plot vertices
-        ax.add_collection3d(Poly3DCollection([vert],facecolors='cyan',edgecolors='black',alpha=0.3))
-
+        hull = ConvexHull(vert)
+        shape = Poly3DCollection([hull.points[facet] for facet in hull.simplices],edgecolors='red')
+        ax.add_collection3d(shape)
         #label axes
         ax.set_xlabel("X")
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
 
+
+        #https://matplotlib.org/stable/api/toolkits/mplot3d/view_angles.html
+        #ax.view_init(45,45,0)
         #find limits assuming all decision variables > 0
         x_max = [x[0] for x in vert]
         x_max = max(x_max)
@@ -186,10 +201,9 @@ def three_var_graphical_solution():
         z_max = [x[2] for x in vert]
         z_max = max(z_max)
 
-
         #set limits
-        plt.xlim(0,x_max)
-        plt.ylim(0,y_max)
+        ax.set_xlim(x_max,0)
+        ax.set_ylim(0,y_max)
         ax.set_zlim3d(0,z_max)
 
         #plot

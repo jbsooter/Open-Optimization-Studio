@@ -37,7 +37,7 @@ else:
         base_url=config.vrp_opts["ors_server"])
 
 
-@st.cache_data(ttl= 2)
+@st.cache_data(ttl= 2,show_spinner=False)
 def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
@@ -211,7 +211,7 @@ def main():
         sub,source, sink = build_route()
 
     if sub is not None:
-        streamlit_folium.folium_static(osmnx.plot_graph_folium(sub))
+        map_location = st.container()
 
         total_length = 0
         for u, v, key, edge_data in sub.edges(keys=True, data=True):
@@ -230,12 +230,15 @@ def main():
 
         route_line = LineString(route_nodes['geometry'].tolist())
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
+
+        with map_location:
+            streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles="Stamen Terrain",style_kwds={"weight":6}), returned_objects=[])
         gdf1.to_file('route1.gpx',"GPX")
         #GPX Download
         file_mem = BytesIO()
         gdf1.to_file(file_mem,'GPX')
-        st.download_button(label='download',file_name="Route.gpx",mime="application/gpx+xml",data=file_mem)
-        st.button(label="Regenerate", on_click=build_route)
+        st.download_button(label='Download GPX',file_name="Route.gpx",mime="application/gpx+xml",data=file_mem)
+        st.button(label="Regenerate Route", on_click=build_route)
 
 if __name__ == "__main__":
     main()
