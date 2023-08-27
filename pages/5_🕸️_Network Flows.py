@@ -1,8 +1,10 @@
 import random
 
 import geopandas
+import numpy as np
 import openrouteservice
 import osmnx as osmnx
+import requests
 import streamlit as st
 import streamlit_folium
 from io import BytesIO
@@ -44,6 +46,13 @@ def build_graph(address):
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
+    #snippet to add elevation to entire graph. this would allow for explicit consideration of grade in the min cost flow problem. This is somewhat computationally expensive on the
+    #open source elevation APIs, which is not preferable. Currently accounting for elevation by guiding the sink node selection with elevation change from origin.
+    #elevation from open topo data
+    #osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
+    #                                           #url_template="https://api.opentopodata.org/v1/aster30m?locations={}&key={}",
+    #                                           url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
+    #                                           max_locations_per_batch=150)
 
     st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
@@ -65,14 +74,20 @@ def cost_function(way,start_node,end_node):
     #avoid raods
     if "highway" in way:
         if way["highway"] in [ "motorway","primary","service","residential","tertiary","service","primary_link","motorway"]:
-            cost = cost +100
+            cost = cost +10
         #prefer cycleways
         if way["highway"]  in ["cycleway"]:
-            cost = cost - 1
+            cost = cost - 3
     #make expensive if not designated foot
     if "foot" in way:
         if way["foot"] not in ["designated"]:
-            cost = cost + 1000
+            cost = cost + 10
+
+    #corresponding cost logic if you were to explicitly consider elevation in min cost flow
+    #if "elevation" in start_node:
+    #    if(np.absolute (end_node["elevation"] - start_node["elevation"])/way["length"] ) > .04:
+    #        cost = cost - 500
+
 
     return cost
 
@@ -117,7 +132,39 @@ def build_route():
     source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
     run_mincostflow.set_node_supply( u_i.get(source_return),1)
     result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
-    sink_return = random.choice(result)
+
+    #add elevation surgically to boundary nodes and source
+    #build post request data for open-elevation.com for boundary region and source node
+    post_data = {"locations":[]}
+    post_data["locations"].append({"latitude": st.session_state["running_graph"].nodes()[source_return]["y"],"longitude":st.session_state["running_graph"].nodes()[source_return]["x"]})
+    for x in result:
+        post_data["locations"].append({"latitude": st.session_state["running_graph"].nodes()[x]["y"],"longitude":st.session_state["running_graph"].nodes()[x]["x"]})
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    #send requests and add to nodes
+    response = requests.post("https://api.open-elevation.com/api/v1/lookup", headers=headers, json=post_data)
+
+    st.session_state["running_graph"].nodes()[source_return]["elevation"] = response.json()["results"][0]["elevation"]
+    resp_no_source = response.json()["results"][1:]
+
+    i = 0
+    for x in result:
+        st.session_state["running_graph"].nodes()[x]["elevation"] = resp_no_source[i]["elevation"]
+        i = i+1
+
+    #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
+    current_max_elev =  0
+    sink_return = []
+    for x in result:
+        if np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"]) > current_max_elev:
+            sink_return.append(x)
+            current_max_elev = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"]- st.session_state["running_graph"].nodes()[source_return]["elevation"])
+
+    sink_return = random.choice(sink_return[-10:])
     run_mincostflow.set_node_supply(u_i.get(sink_return),-1) #far away place
 
     # Run the min cost flow algorithm
@@ -170,7 +217,7 @@ def main():
         for u, v, key, edge_data in sub.edges(keys=True, data=True):
             total_length += edge_data['length']
 
-        st.write(f'Total Distance Out and Back: { total_length/1609}') #meter to mile conversion
+        st.write(f'Total Distance Out and Back: {np.round( total_length/1609,2)}') #meter to mile conversion
 
         route = osmnx.shortest_path(sub,source, sink)
         nodes, edges = osmnx.graph_to_gdfs(sub)
