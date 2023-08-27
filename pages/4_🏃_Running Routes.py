@@ -67,14 +67,15 @@ def cost_function(way,start_node,end_node):
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < 30:
-            cost = cost - 3
-        if int(way["maxspeed"][:2]) > 60:
-            cost = cost + 10
-
+            cost = cost - 5
+        if int(way["maxspeed"][:2]) > 50:
+            cost = cost + 5
+    else: #some side roads have no value
+        cost = cost -5
     #avoid raods
     if "highway" in way:
         if way["highway"] in [ "motorway","primary","service","residential","tertiary","service","primary_link","motorway"]:
-            cost = cost +10
+            cost = cost + 10
         #prefer cycleways
         if way["highway"]  in ["cycleway"]:
             cost = cost - 3
@@ -197,9 +198,9 @@ def main():
     if 'address_coords' not in st.session_state:
         st.session_state['address_coords'] = None
 
-    st.subheader("Network Flows")
+    st.subheader("Running Routes")
 
-    address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete, key="sl")
+    address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])
@@ -232,13 +233,15 @@ def main():
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
         with map_location:
-            streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles="Stamen Terrain",style_kwds={"weight":6}), returned_objects=[])
-        gdf1.to_file('route1.gpx',"GPX")
+            col1,col2 = st.columns([2,1])
+            with col1:
+                streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles="Stamen Terrain",style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
+            col2.button(label="Regenerate Route", on_click=build_route)
         #GPX Download
         file_mem = BytesIO()
         gdf1.to_file(file_mem,'GPX')
         st.download_button(label='Download GPX',file_name="Route.gpx",mime="application/gpx+xml",data=file_mem)
-        st.button(label="Regenerate Route", on_click=build_route)
+
 
 if __name__ == "__main__":
     main()

@@ -1,14 +1,12 @@
 import re
 
-import mpld3 as mpld3
 import numpy as np
 import streamlit as st
 import pandas as pd
-from matplotlib import pyplot as plt, cm
+from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver.python import model_builder as mb
-import  streamlit.components.v1 as components
 from scipy.spatial import ConvexHull
 
 from streamlit_ace import st_ace
