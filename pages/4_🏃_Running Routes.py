@@ -57,13 +57,16 @@ def build_graph(address):
     st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                                                                      clean_periphery=True)
+def cost_func_flat(way, start_node, end_node):
+    return 10
 def cost_function(way,start_node,end_node):
-    cost = 10
+    #https://taginfo.openstreetmap.org/keys
+    cost = 100
 
     #if length is less than 500 metres, penalize to reduce tons of turns
-    if "length" in way:
-        if int(way["length"]) < 500:
-            cost = cost + 1
+    #if "length" in way:
+    #    if int(way["length"]) < 500:
+    #        cost = cost + 25
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < 30:
@@ -81,16 +84,21 @@ def cost_function(way,start_node,end_node):
             cost = cost - 3
     #make expensive if not designated foot
     if "foot" in way:
-        if way["foot"] not in ["designated"]:
+        if way["foot"] not in ["designated","yes"]:
             cost = cost + 10
 
     #corresponding cost logic if you were to explicitly consider elevation in min cost flow
-    #if "elevation" in start_node:
-    #    if(np.absolute (end_node["elevation"] - start_node["elevation"])/way["length"] ) > .04:
-    #        cost = cost - 500
+    if "elevation" in start_node:
+        if "elevation" in end_node:
+            #st.write(np.absolute ((end_node["elevation"] - start_node["elevation"])/way["length"]))
 
+            if(np.absolute ((end_node["elevation"] - start_node["elevation"])/way["length"]) > .025):
+                cost = cost + 10
+    #if "lit" in start_node:
+    #    if start_node["lit"] == "yes":
+    #        cost = cost - 100
 
-    return cost
+    return cost*way["length"]
 
 def build_route():
     #solve
@@ -121,7 +129,8 @@ def build_route():
             i += 1
 
         #define cost
-        cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[u])  # or any other cost function
+        cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
+        #cost = cost_func_flat(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
         capacity = 1  # arc only used once
 
         #add arc info and set supply 0
@@ -159,19 +168,27 @@ def build_route():
 
     #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
     current_max_elev =  0
-    sink_return = []
+    sink_return = {}
     for x in result:
-        if np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"]) > current_max_elev:
-            sink_return.append(x)
-            current_max_elev = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"]- st.session_state["running_graph"].nodes()[source_return]["elevation"])
+        sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
 
-    sink_return = random.choice(sink_return[-10:])
-    run_mincostflow.set_node_supply(u_i.get(sink_return),-1) #far away place
+        #if np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"]) > current_max_elev:
+        #    sink_return.append(x)
+        #    current_max_elev = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"]- st.session_state["running_graph"].nodes()[source_return]["elevation"])
+
+    sink_return = dict(sorted(sink_return.items(), key=lambda item: item[1],reverse=True))
+
+
+    sink_selected = random.choice(list(sink_return.keys()))
+
+
+    run_mincostflow.set_node_supply(u_i.get(sink_selected),-1) #far away place
 
     # Run the min cost flow algorithm
     if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
         # Print the total cost and flow on each edge
         total_cost = run_mincostflow.optimal_cost()
+        st.write(total_cost)
         nodes_ij = []
         for w in range(run_mincostflow.num_arcs()):
             u = run_mincostflow.tail(w)
@@ -187,7 +204,7 @@ def build_route():
         sub = st.session_state["running_graph"].subgraph(nodes_ij)
 
 
-        return sub,source_return, sink_return
+        return sub,source_return, sink_selected
 def main():
     user_entry = st.container()
     #initialize locaiton in session state
