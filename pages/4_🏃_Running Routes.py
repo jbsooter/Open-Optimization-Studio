@@ -4,9 +4,9 @@ import geopandas
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
-import requests
 import streamlit as st
 import streamlit_folium
+import altair as alt
 from io import BytesIO
 from openrouteservice import geocode
 
@@ -23,7 +23,6 @@ osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'n
 
 osmnx.settings.useful_tags_node = ['name','lit','amenity']
 
-
 #retrieve client
 # ORS client to be shared among all methods
 client = None
@@ -36,23 +35,21 @@ else:
         key=st.secrets["ors_key"],
         base_url=config.vrp_opts["ors_server"])
 
-
 @st.cache_data(ttl= 2,show_spinner=False)
 def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
+
 def build_graph(address):
     # query osm
     st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
-    #snippet to add elevation to entire graph. this would allow for explicit consideration of grade in the min cost flow problem. This is somewhat computationally expensive on the
-    #open source elevation APIs, which is not preferable. Currently accounting for elevation by guiding the sink node selection with elevation change from origin.
-    #elevation from open topo data
-    #osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
-    #                                           #url_template="https://api.opentopodata.org/v1/aster30m?locations={}&key={}",
-    #                                           url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
-    #                                           max_locations_per_batch=150)
+    #snippet to add elevation to entire graph.
+    osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
+                                               #url_template="https://api.opentopodata.org/v1/aster30m?locations={}&key={}",
+                                               url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
+                                               max_locations_per_batch=150)
 
     st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
@@ -64,9 +61,9 @@ def cost_function(way,start_node,end_node):
     cost = 100
 
     #if length is less than 500 metres, penalize to reduce tons of turns
-    #if "length" in way:
-    #    if int(way["length"]) < 500:
-    #        cost = cost + 25
+    if "length" in way:
+        if int(way["length"]) < 500:
+            cost = cost + 25
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < 30:
@@ -141,47 +138,25 @@ def build_route():
     # set source and sink
     source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
     run_mincostflow.set_node_supply( u_i.get(source_return),1)
+
+    #get node ids that are on the last graph 1-mi of the considered area
     result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
-
-    #add elevation surgically to boundary nodes and source
-    #build post request data for open-elevation.com for boundary region and source node
-    post_data = {"locations":[]}
-    post_data["locations"].append({"latitude": st.session_state["running_graph"].nodes()[source_return]["y"],"longitude":st.session_state["running_graph"].nodes()[source_return]["x"]})
-    for x in result:
-        post_data["locations"].append({"latitude": st.session_state["running_graph"].nodes()[x]["y"],"longitude":st.session_state["running_graph"].nodes()[x]["x"]})
-
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
-
-    #send requests and add to nodes
-    response = requests.post("https://api.open-elevation.com/api/v1/lookup", headers=headers, json=post_data)
-
-    st.session_state["running_graph"].nodes()[source_return]["elevation"] = response.json()["results"][0]["elevation"]
-    resp_no_source = response.json()["results"][1:]
-
-    i = 0
-    for x in result:
-        st.session_state["running_graph"].nodes()[x]["elevation"] = resp_no_source[i]["elevation"]
-        i = i+1
 
     #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
     current_max_elev =  0
     sink_return = {}
+
+    #add values to node id keys that are the elevation delta (not grade) between source and current node
     for x in result:
         sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
 
-        #if np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"]) > current_max_elev:
-        #    sink_return.append(x)
-        #    current_max_elev = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"]- st.session_state["running_graph"].nodes()[source_return]["elevation"])
-
+    #sort by elevation
     sink_return = dict(sorted(sink_return.items(), key=lambda item: item[1],reverse=True))
 
+    #select from last 100
+    sink_selected = random.choice(list(sink_return.keys())[-int(len(sink_return.keys()) / 2):])
 
-    sink_selected = random.choice(list(sink_return.keys()))
-
-
+    #set sink to the selected
     run_mincostflow.set_node_supply(u_i.get(sink_selected),-1) #far away place
 
     # Run the min cost flow algorithm
@@ -249,6 +224,15 @@ def main():
         route_line = LineString(route_nodes['geometry'].tolist())
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
+        #route_nodes = route_nodes.reset_index()
+        #route_nodes = route_nodes.reset_index()
+        #st.area_chart(route_nodes,x="index",y="elevation")
+        #st.altair_chart(
+        #    alt.Chart(route_nodes[["index","elevation"]]).mark_line().encode(
+        #    x=alt.X('index',scale=alt.Scale(domain=[min(route_nodes["index"]),max(route_nodes["index"])])),
+        #    y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
+        #)
+        #)
         with map_location:
             col1,col2 = st.columns([2,1])
             with col1:
