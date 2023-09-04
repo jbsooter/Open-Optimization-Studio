@@ -207,10 +207,13 @@ def main():
         map_location = st.container()
 
         total_length = 0
+        cumulative_length = [0]
         for u, v, key, edge_data in sub.edges(keys=True, data=True):
-            total_length += edge_data['length']
+            total_length += edge_data['length']/1609
+            cumulative_length.append(total_length)
+        cumulative_length.append(total_length)
 
-        st.write(f'Total Distance Out and Back: {np.round( total_length/1609,2)}') #meter to mile conversion
+        st.write(f'Total Distance Out and Back: {np.round( total_length,2)}') #meter to mile conversion
 
         route = osmnx.shortest_path(sub,source, sink)
         nodes, edges = osmnx.graph_to_gdfs(sub)
@@ -224,15 +227,15 @@ def main():
         route_line = LineString(route_nodes['geometry'].tolist())
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
-        #route_nodes = route_nodes.reset_index()
-        #route_nodes = route_nodes.reset_index()
-        #st.area_chart(route_nodes,x="index",y="elevation")
-        #st.altair_chart(
-        #    alt.Chart(route_nodes[["index","elevation"]]).mark_line().encode(
-        #    x=alt.X('index',scale=alt.Scale(domain=[min(route_nodes["index"]),max(route_nodes["index"])])),
-        #    y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
-        #)
-        #)
+        route_nodes['cumulative distance'] = cumulative_length
+        route_nodes = route_nodes.reset_index()
+        route_nodes = route_nodes.reset_index()
+        st.altair_chart(
+            alt.Chart(route_nodes[["cumulative distance","elevation"]]).mark_line().encode(
+            x=alt.X('cumulative distance',scale=alt.Scale(domain=[min(route_nodes["cumulative distance"]),max(route_nodes["cumulative distance"])])),
+            y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
+        )
+        )
         with map_location:
             col1,col2 = st.columns([2,1])
             with col1:
