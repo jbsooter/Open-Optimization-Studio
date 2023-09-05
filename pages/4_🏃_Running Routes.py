@@ -227,15 +227,15 @@ def main():
         route_line = LineString(route_nodes['geometry'].tolist())
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
-        route_nodes['cumulative distance'] = cumulative_length
-        route_nodes = route_nodes.reset_index()
-        route_nodes = route_nodes.reset_index()
-        st.altair_chart(
-            alt.Chart(route_nodes[["cumulative distance","elevation"]]).mark_line().encode(
-            x=alt.X('cumulative distance',scale=alt.Scale(domain=[min(route_nodes["cumulative distance"]),max(route_nodes["cumulative distance"])])),
-            y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
-        )
-        )
+        #route_nodes['cumulative distance'] = cumulative_length
+        #route_nodes = route_nodes.reset_index()
+        #route_nodes = route_nodes.reset_index()
+        #st.altair_chart(
+        #    alt.Chart(route_nodes[["cumulative distance","elevation"]]).mark_line().encode(
+        #    x=alt.X('cumulative distance',scale=alt.Scale(domain=[min(route_nodes["cumulative distance"]),max(route_nodes["cumulative distance"])])),
+         #   y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
+       # )
+        #)
         with map_location:
             col1,col2 = st.columns([2,1])
             with col1:
