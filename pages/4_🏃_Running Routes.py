@@ -42,7 +42,7 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.2*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
     #snippet to add elevation to entire graph.
@@ -51,9 +51,13 @@ def build_graph(address):
                                                url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
                                                max_locations_per_batch=150)
 
-    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
+    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
-                                                                                                     clean_periphery=True)
+
+                                                                                             clean_periphery=True)
+    build_route()
+
+#used for testing the real cost function
 def cost_func_flat(way, start_node, end_node):
     return 10
 def cost_function(way,start_node,end_node):
@@ -102,7 +106,7 @@ def cost_function(way,start_node,end_node):
 
 def build_route():
     results = []
-    for i in range(0,300):
+    for i in range(0,10):
         #solve
         run_mincostflow = min_cost_flow.SimpleMinCostFlow()
         # Define the cost and capacity for each edge
@@ -168,7 +172,7 @@ def build_route():
         if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
             # Print the total cost and flow on each edge
             total_cost = run_mincostflow.optimal_cost()
-            st.write(total_cost)
+
             nodes_ij = []
             for w in range(run_mincostflow.num_arcs()):
                 u = run_mincostflow.tail(w)
@@ -185,16 +189,27 @@ def build_route():
             results.append([sub,source_return,sink_selected,total_cost])
 
         results.sort(key = lambda row: row[3])
-        return results[0][:3]
+        st.session_state["sub"] = results[0][0]
+        st.session_state["source"] = results[0][1]
+        st.session_state["sink"] = results[0][2]
+
+        #return results[0][:3]
 def main():
-    user_entry = st.container()
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
         st.session_state['running_graph'] = None
 
-
     if 'address_coords' not in st.session_state:
         st.session_state['address_coords'] = None
+
+    if 'sub' not in st.session_state:
+        st.session_state['sub'] = None
+
+    if 'source' not in st.session_state:
+        st.session_state['source'] = None
+
+    if 'sink' not in st.session_state:
+        st.session_state['sink'] = None
 
     st.subheader("Running Routes")
 
@@ -203,25 +218,26 @@ def main():
     #run  model
     st.button("Go!",on_click=build_graph,args=[address])
 
-    sub = None
-    source = None
-    sink = None
-    if st.session_state["running_graph"] is not None:
-        sub,source, sink = build_route()
-
-    if sub is not None:
+    if st.session_state["sub"] is not None:
+        sub = st.session_state["sub"]
+        source = st.session_state["source"]
+        sink = st.session_state["sink"]
         map_location = st.container()
 
         total_length = 0
         cumulative_length = [0]
-        for u, v, key, edge_data in sub.edges(keys=True, data=True):
-            total_length += edge_data['length']/1609
+
+        route = osmnx.shortest_path(sub,source, sink)
+        sub = sub.subgraph(route)
+
+        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
+            total_length += edge_data['length']
             cumulative_length.append(total_length)
         cumulative_length.append(total_length)
 
-        st.write(f'Total Distance Out and Back: {np.round( total_length,2)}') #meter to mile conversion
+        st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
 
-        route = osmnx.shortest_path(sub,source, sink)
+
         nodes, edges = osmnx.graph_to_gdfs(sub)
 
         #out and back, reverse shortest path nodes list and append
