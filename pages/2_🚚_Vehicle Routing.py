@@ -52,7 +52,7 @@ def geocode_addresses(addresses):
 
     coordinates = []
     for location in addresses:
-        result = pelias_search(client=client, text=location,country="USA",boundary_gid=st.session_state["geocoding_region"])
+        result = pelias_search(client=client, text=location,country="USA") #,boundary_gid=st.session_state["geocoding_region"] #currently not supported
         #centroid of bounding box of result
         coordinates.append([(result["bbox"][0] +result["bbox"][2])/2.0  ,(result["bbox"][1] + result["bbox"][3])/2.0])
     return coordinates
@@ -135,7 +135,6 @@ def generic_vrp(addresses, depot_index):
     solution = routing.SolveWithParameters(search_parameters)
     # Print solution on console.
     if solution:
-        # for i in range(1,all_solutions.SolutionCount()): #1 to skip repeat
         # initial
         st.write(all_solutions.ObjectiveValue(
             all_solutions.SolutionCount() - 1))
@@ -308,8 +307,8 @@ def main():
     # select vehicle capacity
     st.number_input("Vehicle Order Capacity", key="vehicle_capacity",value=3,step=1)
 
-    # constrain geocoding region
-    st.text_input("Region",key="geocoding_region")
+    # constrain geocoding region (not currently supported
+    # st.text_input("Region",key="geocoding_region")
     # input addresses
     st.session_state.addresses_df = pd.DataFrame(
         {
@@ -321,7 +320,7 @@ def main():
                 True,
                 False,
                 False]})
-    st.session_state["input_addresses"] = st.experimental_data_editor(
+    st.session_state["input_addresses"] = st.data_editor(
         data=st.session_state["addresses_df"],
         num_rows="dynamic",
         key="edited_addresses_df")
@@ -336,8 +335,8 @@ def main():
             st.markdown(x)
 
         if st.session_state['vrp_solution']['map'] is not None:
-            streamlit_folium.folium_static(
-                st.session_state['vrp_solution']['map'], width=700)
+            streamlit_folium.st_folium(
+                st.session_state['vrp_solution']['map'], width=700,returned_objects=[])
         if st.session_state['vrp_solution']['improvement'] is not None:
             st.pyplot(st.session_state['vrp_solution']['improvement'])
         if st.session_state['vrp_solution']['routes'] is not None:
@@ -349,8 +348,6 @@ def main():
                         for z in y["steps"]:
                             st.write(z["instruction"])
                     veh_count = veh_count + 1
-
-
 
 if __name__ == "__main__":
     main()

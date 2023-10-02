@@ -1,11 +1,14 @@
-import io
 import re
 
+import numpy as np
 import streamlit as st
 import pandas as pd
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver.python import model_builder as mb
+from scipy.spatial import ConvexHull
+
 from streamlit_ace import st_ace
 
 from utilities import config
@@ -23,7 +26,6 @@ def add_column():
     st.session_state['df_mip'].insert(
         ncols - 2, f"var{ncols-1}", ['0'] * nrows)
     st.session_state['df_obj'][f"var{ncols-1}"] = [0]
-
 
 def solve_mip():
     # grab any modifications from data input
@@ -147,6 +149,66 @@ def solution_printer(solver):
          c in enumerate(solver.constraints())]
     st.session_state["sensitivity_analysis"] = pd.DataFrame(o)
 
+
+class Arrow3D:
+    pass
+
+
+def three_var_graphical_solution():
+    #https://demonstrations.wolfram.com/GraphicalLinearProgrammingForThreeVariables/
+    if len(st.session_state["df_mip"].columns) - 2 == 3:
+        #get constraints
+        df = st.session_state["df_mip"]
+        #assign coeffs and rhs to column variables
+        a = np.array(df["var1"][1:].astype(float))
+        b = np.array(df["var2"][1:].astype(float))
+        c = np.array(df["var3"][1:].astype(float))
+        d = np.array(df["RHS"][1:].astype(float))
+
+        #create matplotlib objects
+        fig = plt.figure()
+        ax = fig.add_subplot(111,projection='3d')
+
+        #find zeros (vertices)
+        vert = []
+        for i in range(0,len(a)):
+            vert.append([min(100000,d[i]/a[i]),0,0])
+            vert.append([0,min(100000,d[i]/b[i]),0])
+            vert.append([0,0,min(100000,d[i]/c[i])])
+
+        vert.append([0,0,0])
+
+        hull = ConvexHull(vert)
+        shape = Poly3DCollection([hull.points[facet] for facet in hull.simplices],edgecolors='red')
+        ax.add_collection3d(shape)
+        #label axes
+        ax.set_xlabel("X")
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+
+        #https://matplotlib.org/stable/api/toolkits/mplot3d/view_angles.html
+        #ax.view_init(45,45,0)
+        #find limits assuming all decision variables > 0
+        x_max = [x[0] for x in vert]
+        x_max = max(x_max)
+
+        y_max = [x[1] for x in vert]
+        y_max = max(y_max)
+
+        z_max = [x[2] for x in vert]
+        z_max = max(z_max)
+
+        #set limits
+        ax.set_xlim(x_max,0)
+        ax.set_ylim(0,y_max)
+        ax.set_zlim3d(0,z_max)
+
+        #plot
+        return fig
+    else:
+        return None
+
 def two_var_graphical_solution():
     # set color scheme
     color_defaults = config.two_var_color_defaults
@@ -170,7 +232,7 @@ def two_var_graphical_solution():
 
             # for every row in df that represents a constraint
             for i in range(1, len(df)):
-                # try to produce x and y intercepts of constraints at equality
+                # produce x and y intercepts of constraints at equality
                 try:
                     ci_var1, ci_var2 = [float(df[df.columns[-1]][i]) / float(df[df.columns[0]][i]), 0], \
                         [0, float(df[df.columns[-1]][i]) / float(df[df.columns[1]][i])]
@@ -277,7 +339,6 @@ def solve_lp_file(lp_string):
     #declare modelBuilder
     model = mb.ModelBuilder()
 
-
     #Pre-OR-Tools Clean.
     # 1. Removes // style comments.
     # Assumes lp_string coming in as single string
@@ -318,11 +379,6 @@ def solve_lp_file(lp_string):
     # update solution status. TOD:ckean up
     st.session_state['solution_message'] = str(status)
 
-    # print out variable values to ensure working
-    # variables = [model.var_from_index(i) for i in range(model.num_variables)]
-    # for x in variables:
-    #    st.write(x.name + ": " +  str(solver.value(x)))
-
     # convert soluiton to df
     # Create an empty dictionary to store the column names and values
     solution = {}
@@ -347,11 +403,6 @@ def solve_lp_file(lp_string):
     st.session_state['last_solution'] = df
 
     if st.session_state['lp_type'] == 'lp':
-        #solver.activity(model.cons)
-        #o = [{'Name': c.name(),
-        #  'Shadow Price': c.dual_value(),
-        #  'Slack': c.ub() - activities[i]} for i,
-        #                                       c in enumerate(solver.constraints())]
         #todo produce this
         st.session_state["sensitivity_analysis"] = None
 
@@ -422,10 +473,10 @@ def main():
         col1, col2 = st.columns([2,1])
         with col1:
             # load obj grid, save input
-            st.session_state['input_obj'] = st.experimental_data_editor(
+            st.session_state['input_obj'] = st.data_editor(
                 st.session_state["df_obj"], num_rows="dynamic")
             # load input grid, save input
-            st.session_state['input_mip'] = st.experimental_data_editor(
+            st.session_state['input_mip'] = st.data_editor(
                 st.session_state["df_mip"], num_rows="dynamic")
 
         with col2:
@@ -453,11 +504,16 @@ def main():
             # determine if a graphical solution can be generated
             figure = two_var_graphical_solution()
 
+            if figure is None:
+                figure = three_var_graphical_solution()
+
+
         # if a graphical solution generated, display it
         if figure is not None:
             st.write("Graphical Representation")
             col1, col2 = st.columns([3, 2])
             col1.pyplot(figure)
+
 
 
 if __name__ == "__main__":
