@@ -42,7 +42,7 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 
 def build_graph(address):
     # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.2*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
                                                              clean_periphery=True)
     #snippet to add elevation to entire graph.
@@ -51,15 +51,12 @@ def build_graph(address):
                                                url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
                                                max_locations_per_batch=150)
 
-    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"] - 1)*1609/2, dist_type='network',network_type="all",
+    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
 
                                                                                              clean_periphery=True)
     build_route()
 
-#used for testing the real cost function
-def cost_func_flat(way, start_node, end_node):
-    return 10
 def cost_function(way,start_node,end_node):
     #https://taginfo.openstreetmap.org/keys
     cost = 100
@@ -224,16 +221,29 @@ def main():
         sink = st.session_state["sink"]
         map_location = st.container()
 
-        total_length = 0
-        cumulative_length = [0]
+        total_length = 10000000000
+        route = []
 
-        route = osmnx.shortest_path(sub,source, sink)
-        sub = sub.subgraph(route)
+        while total_length/1609.34 > 1.0000001*st.session_state["mileage"]:
+            total_length_old = total_length
+            route_old = route
+            sub_old = sub
+            total_length = 0
 
-        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-            total_length += edge_data['length']
-            cumulative_length.append(total_length)
-        cumulative_length.append(total_length)
+            route = osmnx.shortest_path(sub,source, sink)
+            sub = sub.subgraph(route)
+
+            for u,v,  key, edge_data in sub.edges(keys=True, data=True):
+                total_length += edge_data['length']
+
+            if(total_length/1609.34 < st.session_state["mileage"]):
+                route = route_old
+                total_length = total_length_old
+                sub = sub_old
+                break
+            else:
+                sink = route[-2]
+
 
         st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
 
