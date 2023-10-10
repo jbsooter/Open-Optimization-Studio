@@ -47,17 +47,21 @@ def build_graph(address,type):
             st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["address_coords"] = address
+
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
+                                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False)
         else:
             # query osm
             st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
+                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
     with st.spinner(text="Requesting Elevation Data"):
         #snippet to add elevation to entire graph.
         osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
                                                url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
 
-        st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
-                                                                                                     simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,)
+
     build_route()
 
 def cost_function(way,start_node,end_node):
