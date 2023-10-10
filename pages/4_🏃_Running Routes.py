@@ -1,13 +1,14 @@
 import random
-
+import geocoder
 import geopandas
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
 import streamlit as st
 import streamlit_folium
-import altair as alt
 from io import BytesIO
+
+from folium import folium
 from openrouteservice import geocode
 
 import streamlit_searchbox
@@ -40,21 +41,23 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
 
-def build_graph(address):
-    # query osm
-    st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
-                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
-                                                             clean_periphery=True)
-    #snippet to add elevation to entire graph.
-    osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
-                                               #url_template="https://api.opentopodata.org/v1/aster30m?locations={}&key={}",
-                                               url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}",
-                                               max_locations_per_batch=150)
+def build_graph(address,type):
+    with st.spinner(text="Requesting Map Data"):
+        if type == "coords":
+            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+                                                                                                             simplify=False, retain_all=False, truncate_by_edge=False)
+            st.session_state["address_coords"] = address
+        else:
+            # query osm
+            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
+    with st.spinner(text="Requesting Elevation Data"):
+        #snippet to add elevation to entire graph.
+        osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
+                                               url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
 
-    st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
-                                                                                                     simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,
-
-                                                                                             clean_periphery=True)
+        st.session_state["running_boundary_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
+                                                                                                     simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,)
     build_route()
 
 def cost_function(way,start_node,end_node):
@@ -72,7 +75,7 @@ def cost_function(way,start_node,end_node):
         if int(way["maxspeed"][:2]) > 50:
             cost = cost + 10
     else: #some side roads have no value
-        cost = cost -10
+        cost = cost - 10
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
@@ -103,7 +106,7 @@ def cost_function(way,start_node,end_node):
 
 def build_route():
     results = []
-    for i in range(0,10):
+    for i in range(0,config.running_opts["out_back_node_n"]):
         #solve
         run_mincostflow = min_cost_flow.SimpleMinCostFlow()
         # Define the cost and capacity for each edge
@@ -207,13 +210,32 @@ def main():
 
     if 'sink' not in st.session_state:
         st.session_state['sink'] = None
+    if 'uli' not in st.session_state:
+        st.session_state['uli'] = None
 
     st.subheader("Running Routes")
 
-    address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
+    map_mode = st.toggle("Map Mode")
+
+    if map_mode:
+        a = st.text_input("Lat")
+        b = st.text_input("Lon")
+        address = [float(a),float(b)]
+        #user_location_input = streamlit_folium.st_folium(folium.Map(location=geocoder.ip('me').latlng))
+        #st.write(user_location_input["last_clicked"] )
+        #if user_location_input["last_clicked"] is not {}:
+        #    st.session_state["uli"] = user_location_input.copy()["last_clicked"]
+
+        #if st.session_state["uli"] is not None:
+        #    address = {st.session_state["uli"]["lat"], st.session_state["uli"]["lng"]}
+    else:
+        address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
+
+    #test folium entry
+
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
-    st.button("Go!",on_click=build_graph,args=[address])
+    st.button("Go!",on_click=build_graph,args=[address, "coords"])
 
     if st.session_state["sub"] is not None:
         sub = st.session_state["sub"]
@@ -245,9 +267,6 @@ def main():
                 sink = route[-2]
 
 
-        st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
-
-
         nodes, edges = osmnx.graph_to_gdfs(sub)
 
         #out and back, reverse shortest path nodes list and append
@@ -257,6 +276,7 @@ def main():
         route_nodes = nodes.loc[route]
 
         route_line = LineString(route_nodes['geometry'].tolist())
+
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
         #route_nodes['cumulative distance'] = cumulative_length
@@ -268,15 +288,20 @@ def main():
          #   y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
        # )
         #)
-        with map_location:
-            col1,col2 = st.columns([2,1])
-            with col1:
-                streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles="Stamen Terrain",style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
-            col2.button(label="Regenerate Route", on_click=build_route)
-        #GPX Download
-        file_mem = BytesIO()
-        gdf1.to_file(file_mem,'GPX')
-        st.download_button(label='Download GPX',file_name="Route.gpx",mime="application/gpx+xml",data=file_mem)
+
+
+        #check to ensure no length/origin parameter changes
+        if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
+            st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
+            with map_location:
+                col1,col2 = st.columns([2,1])
+                with col1:
+                    streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles=config.running_opts["map_tile"],style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
+                col2.button(label="Regenerate Route", on_click=build_route)
+            #GPX Download
+            file_mem = BytesIO()
+            gdf1.to_file(file_mem,'GPX')
+            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
 
 
 if __name__ == "__main__":

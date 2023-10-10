@@ -65,9 +65,11 @@ scheduling_opts = dict(
 
 )
 
-# Network Options
-network_flows_opts = dict(
-
+# Running Options
+running_opts = dict(
+    map_tile = 'OpenStreetMap',
+    gpx_file_name = "route.gpx",
+    out_back_node_n = 10
 )
 
 # Knapsack Options

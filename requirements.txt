@@ -16,3 +16,4 @@ pandas
 scipy
 geopandas
 shapely
+geocoder
