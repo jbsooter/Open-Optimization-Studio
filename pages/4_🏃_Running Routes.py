@@ -60,8 +60,6 @@ def build_graph(address,type):
         #snippet to add elevation to entire graph.
         osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
                                                url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
-
-
     build_route()
 
 def cost_function(way,start_node,end_node):
@@ -106,51 +104,20 @@ def cost_function(way,start_node,end_node):
     #    if start_node["lit"] == "yes":
     #        cost = cost - 100
 
-    return cost*way["length"]
+    if cost*way['length'] <= 0:
+        return 0
+    else:
+        return cost*way["length"]
 
 def build_route():
+    #test shortest path only
     results = []
     for i in range(0,config.running_opts["out_back_node_n"]):
-        #solve
-        run_mincostflow = min_cost_flow.SimpleMinCostFlow()
-        # Define the cost and capacity for each edge
-        #convert to zero based integer ortools
-        i = 0
-        u_i = {}
-        i_u = {}
         for u, v, data in st.session_state["running_graph"].edges(data=True):
-            #convert ids to unique integers
-            i_iter = 0
-            j_iter = 0
-            if u in u_i:
-                i_iter = u_i.get(u)
-            else:
-                i_iter = i
-                u_i[u] = i
-                i_u[i] = u
-                i += 1
-
-            if v in u_i:
-                j_iter = u_i.get(v)
-            else:
-                j_iter = i
-                u_i[v] = i
-                i_u[i] = v
-                i += 1
-
-            #define cost
-            cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
-            #cost = cost_func_flat(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
-            capacity = 1  # arc only used once
-
-            #add arc info and set supply 0
-            run_mincostflow.add_arc_with_capacity_and_unit_cost(i_iter, j_iter, capacity, int(cost))
-            run_mincostflow.set_node_supply(i_iter,0)
-            run_mincostflow.set_node_supply(j_iter,0)
+            data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
 
         # set source and sink
         source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
-        run_mincostflow.set_node_supply( u_i.get(source_return),1)
 
         #get node ids that are on the last graph 1-mi of the considered area
         result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
@@ -159,6 +126,7 @@ def build_route():
         current_max_elev =  0
         sink_return = {}
 
+        #130-137 are debatable
         #add values to node id keys that are the elevation delta (not grade) between source and current node
         for x in result:
             sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
@@ -169,35 +137,112 @@ def build_route():
         #select from last 100
         sink_selected = random.choice(list(sink_return.keys()))
 
-        #set sink to the selected
-        run_mincostflow.set_node_supply(u_i.get(sink_selected),-1) #far away place
 
-        # Run the min cost flow algorithm
-        if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
-            # Print the total cost and flow on each edge
-            total_cost = run_mincostflow.optimal_cost()
+        route = osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
-            nodes_ij = []
-            for w in range(run_mincostflow.num_arcs()):
-                u = run_mincostflow.tail(w)
-                v = run_mincostflow.head(w)
-                flow = run_mincostflow.flow(w)
-                cost = run_mincostflow.unit_cost(w)
+        sub = st.session_state["running_graph"].subgraph(route)
 
-                if flow > 0:
-                    #st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
-                    nodes_ij.append(i_u.get(u))
-                    nodes_ij.append(i_u.get(v))
+        total_cost = 0
+        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
+            total_cost += edge_data['cost']
+        results.append([sub,source_return,sink_selected,total_cost])
 
-            sub = st.session_state["running_graph"].subgraph(nodes_ij)
-            results.append([sub,source_return,sink_selected,total_cost])
 
-        results.sort(key = lambda row: row[3])
-        st.session_state["sub"] = results[0][0]
-        st.session_state["source"] = results[0][1]
-        st.session_state["sink"] = results[0][2]
+    results.sort(key = lambda row: row[3])
+    st.session_state["sub"] = results[0][0]
+    st.session_state["source"] = results[0][1]
+    st.session_state["sink"] = results[0][2]
 
-        #return results[0][:3]
+
+    # results = []
+    # for i in range(0,config.running_opts["out_back_node_n"]):
+    #     #solve
+    #     run_mincostflow = min_cost_flow.SimpleMinCostFlow()
+    #     # Define the cost and capacity for each edge
+    #     #convert to zero based integer ortools
+    #     i = 0
+    #     u_i = {}
+    #     i_u = {}
+    #     for u, v, data in st.session_state["running_graph"].edges(data=True):
+    #         #convert ids to unique integers
+    #         i_iter = 0
+    #         j_iter = 0
+    #         if u in u_i:
+    #             i_iter = u_i.get(u)
+    #         else:
+    #             i_iter = i
+    #             u_i[u] = i
+    #             i_u[i] = u
+    #             i += 1
+    #
+    #         if v in u_i:
+    #             j_iter = u_i.get(v)
+    #         else:
+    #             j_iter = i
+    #             u_i[v] = i
+    #             i_u[i] = v
+    #             i += 1
+    #
+    #         #define cost
+    #         cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
+    #         #cost = cost_func_flat(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
+    #         capacity = 1  # arc only used once
+    #
+    #         #add arc info and set supply 0
+    #         run_mincostflow.add_arc_with_capacity_and_unit_cost(i_iter, j_iter, capacity, int(cost))
+    #         run_mincostflow.set_node_supply(i_iter,0)
+    #         run_mincostflow.set_node_supply(j_iter,0)
+    #
+    #     # set source and sink
+    #     source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+    #     run_mincostflow.set_node_supply( u_i.get(source_return),1)
+    #
+    #     #get node ids that are on the last graph 1-mi of the considered area
+    #     result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
+    #
+    #     #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
+    #     current_max_elev =  0
+    #     sink_return = {}
+    #
+    #     #add values to node id keys that are the elevation delta (not grade) between source and current node
+    #     for x in result:
+    #         sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
+    #
+    #     #sort by elevation
+    #     sink_return = dict(sorted(sink_return.items(), key=lambda item: item[1],reverse=True))
+    #
+    #     #select from last 100
+    #     sink_selected = random.choice(list(sink_return.keys()))
+    #
+    #     #set sink to the selected
+    #     run_mincostflow.set_node_supply(u_i.get(sink_selected),-1) #far away place
+    #
+    #     # Run the min cost flow algorithm
+    #     if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
+    #         # Print the total cost and flow on each edge
+    #         total_cost = run_mincostflow.optimal_cost()
+    #
+    #         nodes_ij = []
+    #         for w in range(run_mincostflow.num_arcs()):
+    #             u = run_mincostflow.tail(w)
+    #             v = run_mincostflow.head(w)
+    #             flow = run_mincostflow.flow(w)
+    #             cost = run_mincostflow.unit_cost(w)
+    #
+    #             if flow > 0:
+    #                 #st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
+    #                 nodes_ij.append(i_u.get(u))
+    #                 nodes_ij.append(i_u.get(v))
+    #
+    #         sub = st.session_state["running_graph"].subgraph(nodes_ij)
+    #         results.append([sub,source_return,sink_selected,total_cost])
+    #
+    #     results.sort(key = lambda row: row[3])
+    #     st.session_state["sub"] = results[0][0]
+    #     st.session_state["source"] = results[0][1]
+    #     st.session_state["sink"] = results[0][2]
+    #
+    #     #return results[0][:3]
 def main():
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
@@ -219,24 +264,18 @@ def main():
 
     st.subheader("Running Routes")
 
-    map_mode = st.toggle("Map Mode")
+    map_mode = st.toggle("Select Start Location Via Map")
+
+    address = None
 
     if map_mode:
-        a = st.text_input("Lat")
-        b = st.text_input("Lon")
-        address = [float(a),float(b)]
-        #user_location_input = streamlit_folium.st_folium(folium.Map(location=geocoder.ip('me').latlng))
-        #st.write(user_location_input["last_clicked"] )
-        #if user_location_input["last_clicked"] is not {}:
-        #    st.session_state["uli"] = user_location_input.copy()["last_clicked"]
-
-        #if st.session_state["uli"] is not None:
-        #    address = {st.session_state["uli"]["lat"], st.session_state["uli"]["lng"]}
+        user_location_input = streamlit_folium.st_folium(folium.Map(location=geocoder.ip('me').latlng))
+        if user_location_input["last_clicked"] != None:
+            address = [user_location_input["last_clicked"]["lat"],user_location_input["last_clicked"]["lng"]]
     else:
         address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
 
     #test folium entry
-
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
     st.button("Go!",on_click=build_graph,args=[address, "coords"])
@@ -292,7 +331,6 @@ def main():
          #   y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
        # )
         #)
-
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
