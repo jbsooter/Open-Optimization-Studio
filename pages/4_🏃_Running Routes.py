@@ -8,7 +8,7 @@ import streamlit as st
 import streamlit_folium
 from io import BytesIO
 
-from folium import folium
+import folium
 from openrouteservice import geocode
 
 import streamlit_searchbox
@@ -64,46 +64,45 @@ def build_graph(address,type):
 
 def cost_function(way,start_node,end_node):
     #https://taginfo.openstreetmap.org/keys
-    cost = 100
+    cost = 1000
 
     #if length is less than 500 metres, penalize to reduce tons of turns
-    #if "length" in way:
-    #    if int(way["length"]) < 500:
-    #        cost = cost + 25
+    if "length" in way:
+        if int(way["length"]) < 500:
+            cost = cost + 500
+        elif int(way["length"]) < 1000:
+            cost = cost + 200
+        elif int(way["length"]) < 1500:
+            cost = cost + 100
+
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < 30:
-            cost = cost - 10
+            cost = cost - 250
         if int(way["maxspeed"][:2]) > 50:
-            cost = cost + 10
+            cost = cost + 750
     else: #some side roads have no value
         cost = cost - 10
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
-            cost = cost + 25
-        if way["highway"] in ["service"]:
-            cost = cost + 10
+            cost = cost + 500
+        if way["highway"] in ["service","residential","unclassified"]:
+            cost = cost + 300
         #prefer cycleways
-        if way["highway"]  in ["cycleway","track","residential","footway","tertiary"]:
-            cost = cost - 25
+        if way["highway"]  in ["cycleway","pedestrian","track","footway","tertiary","path","crossing"]:
+            cost = cost - 500
     #make expensive if not designated foot
     if "foot" in way:
-        if way["foot"] not in ["designated","yes"]:
-            cost = cost + 10
+        #if way["foot"] not in ["designated","yes"]:
+        cost = cost + 500
 
-    #corresponding cost logic if you were to explicitly consider elevation in min cost flow
+    #add 100x grade to cost per way
     if "elevation" in start_node:
         if "elevation" in end_node:
-            #st.write(np.absolute ((end_node["elevation"] - start_node["elevation"])/way["length"]))
+            cost = cost + 100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
 
-            cost = cost - 100*np.sqrt(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))
-            #if(np.absolute ((end_node["elevation"] - start_node["elevation"])/way["length"]) > .025):
-            #    cost = cost + 10
-    #if "lit" in start_node:
-    #    if start_node["lit"] == "yes":
-    #        cost = cost - 100
-
+    #No negative costs
     if cost*way['length'] <= 0:
         return 0
     else:
@@ -122,21 +121,7 @@ def build_route():
         #get node ids that are on the last graph 1-mi of the considered area
         result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
 
-        #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
-        current_max_elev =  0
-        sink_return = {}
-
-        #130-137 are debatable
-        #add values to node id keys that are the elevation delta (not grade) between source and current node
-        for x in result:
-            sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
-
-        #sort by elevation
-        sink_return = dict(sorted(sink_return.items(), key=lambda item: item[1],reverse=True))
-
-        #select from last 100
-        sink_selected = random.choice(list(sink_return.keys()))
-
+        sink_selected = random.choice(result)
 
         route = osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
@@ -269,9 +254,14 @@ def main():
     address = None
 
     if map_mode:
-        user_location_input = streamlit_folium.st_folium(folium.Map(location=geocoder.ip('me').latlng))
+        m = folium.Map(location=geocoder.ip('me').latlng,zoom_start=13)
+
+        folium.LatLngPopup().add_to(m)
+        user_location_input = streamlit_folium.st_folium(m)
+
         if user_location_input["last_clicked"] != None:
             address = [user_location_input["last_clicked"]["lat"],user_location_input["last_clicked"]["lng"]]
+            folium.Marker(address).add_to(m)
     else:
         address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
 
@@ -321,16 +311,6 @@ def main():
         route_line = LineString(route_nodes['geometry'].tolist())
 
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
-
-        #route_nodes['cumulative distance'] = cumulative_length
-        #route_nodes = route_nodes.reset_index()
-        #route_nodes = route_nodes.reset_index()
-        #st.altair_chart(
-        #    alt.Chart(route_nodes[["cumulative distance","elevation"]]).mark_line().encode(
-        #    x=alt.X('cumulative distance',scale=alt.Scale(domain=[min(route_nodes["cumulative distance"]),max(route_nodes["cumulative distance"])])),
-         #   y=alt.Y('elevation',scale=alt.Scale(domain=[min(route_nodes["elevation"]),max(route_nodes["elevation"])]))
-       # )
-        #)
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
