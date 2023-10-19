@@ -41,9 +41,9 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
 
-def build_graph(address,type):
+def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):
-        if type == "coords":
+        if map_mode == True:
             st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["address_coords"] = address
@@ -268,7 +268,7 @@ def main():
     #test folium entry
     st.number_input("Desired Mileage", value=3, key="mileage")
     #run  model
-    st.button("Go!",on_click=build_graph,args=[address, "coords"])
+    st.button("Go!",on_click=build_graph,args=[address, map_mode])
 
     if st.session_state["sub"] is not None:
         sub = st.session_state["sub"]
