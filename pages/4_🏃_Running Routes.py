@@ -254,7 +254,7 @@ def main():
     address = None
 
     if map_mode:
-        m = folium.Map(location=geocoder.ip('me').latlng,zoom_start=13,tiles=config.running_routes["map_tile"], attr=config.running_routes["map_tile_attr"])
+        m = folium.Map(location=geocoder.ip('me').latlng,zoom_start=13,tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
 
         folium.LatLngPopup().add_to(m)
         user_location_input = streamlit_folium.st_folium(m)
