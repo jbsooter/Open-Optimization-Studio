@@ -318,7 +318,7 @@ def main():
             with map_location:
                 col1,col2 = st.columns([2,1])
                 with col1:
-                    streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles=config.running_opts["map_tile"],style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
+                    streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles=config.running_opts["map_tile"],attr="OpenTopoMap",style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
                 col2.button(label="Regenerate Route", on_click=build_route)
             #GPX Download
             file_mem = BytesIO()
