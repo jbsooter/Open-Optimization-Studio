@@ -67,7 +67,7 @@ scheduling_opts = dict(
 
 # Running Options
 running_opts = dict(
-    map_tile = 'OpenStreetMap',
+    map_tile = 'OpenTopoMap',
     gpx_file_name = "route.gpx",
     out_back_node_n = 10
 )
