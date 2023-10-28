@@ -72,7 +72,8 @@ running_opts = dict(
     map_tile_attr = 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
 ,
     gpx_file_name = "route.gpx",
-    out_back_node_n = 10
+    out_back_node_n = 10,
+    osmnx_network_type = "all"
 )
 
 # Knapsack Options

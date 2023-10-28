@@ -1,19 +1,18 @@
 import random
-import geocoder
 import geopandas
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
 import streamlit as st
 import streamlit_folium
+import folium
+import streamlit_searchbox
+
+from openrouteservice import geocode
+from shapely import LineString
 from io import BytesIO
 
-import folium
-from openrouteservice import geocode
-
-import streamlit_searchbox
-from ortools.graph.python import min_cost_flow
-from shapely import LineString
+from streamlit_js_eval import get_geolocation
 
 from utilities import config
 
@@ -44,17 +43,18 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
-            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["address_coords"] = address
 
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
-                                                                                                                      simplify=False, retain_all=False, truncate_by_edge=False)
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+                                                                                                                  simplify=False, retain_all=False, truncate_by_edge=False)
+            st.session_state["select_map"] = False
         else:
             # query osm
-            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type="all",
+            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type="all",
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
     with st.spinner(text="Requesting Elevation Data"):
         #snippet to add elevation to entire graph.
@@ -95,7 +95,7 @@ def cost_function(way,start_node,end_node):
     #make expensive if not designated foot
     if "foot" in way:
         #if way["foot"] not in ["designated","yes"]:
-        cost = cost + 500
+        cost = cost - 500
 
     #add 100x grade to cost per way
     if "elevation" in start_node:
@@ -138,96 +138,6 @@ def build_route():
     st.session_state["source"] = results[0][1]
     st.session_state["sink"] = results[0][2]
 
-
-    # results = []
-    # for i in range(0,config.running_opts["out_back_node_n"]):
-    #     #solve
-    #     run_mincostflow = min_cost_flow.SimpleMinCostFlow()
-    #     # Define the cost and capacity for each edge
-    #     #convert to zero based integer ortools
-    #     i = 0
-    #     u_i = {}
-    #     i_u = {}
-    #     for u, v, data in st.session_state["running_graph"].edges(data=True):
-    #         #convert ids to unique integers
-    #         i_iter = 0
-    #         j_iter = 0
-    #         if u in u_i:
-    #             i_iter = u_i.get(u)
-    #         else:
-    #             i_iter = i
-    #             u_i[u] = i
-    #             i_u[i] = u
-    #             i += 1
-    #
-    #         if v in u_i:
-    #             j_iter = u_i.get(v)
-    #         else:
-    #             j_iter = i
-    #             u_i[v] = i
-    #             i_u[i] = v
-    #             i += 1
-    #
-    #         #define cost
-    #         cost = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
-    #         #cost = cost_func_flat(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])  # or any other cost function
-    #         capacity = 1  # arc only used once
-    #
-    #         #add arc info and set supply 0
-    #         run_mincostflow.add_arc_with_capacity_and_unit_cost(i_iter, j_iter, capacity, int(cost))
-    #         run_mincostflow.set_node_supply(i_iter,0)
-    #         run_mincostflow.set_node_supply(j_iter,0)
-    #
-    #     # set source and sink
-    #     source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
-    #     run_mincostflow.set_node_supply( u_i.get(source_return),1)
-    #
-    #     #get node ids that are on the last graph 1-mi of the considered area
-    #     result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
-    #
-    #     #base sink on elevation. Find the greater absolute elevation difference nodes from nboundary region, take the top 10, and randomly select one of them for min cost flow
-    #     current_max_elev =  0
-    #     sink_return = {}
-    #
-    #     #add values to node id keys that are the elevation delta (not grade) between source and current node
-    #     for x in result:
-    #         sink_return[x] = np.absolute(st.session_state["running_graph"].nodes()[x]["elevation"] - st.session_state["running_graph"].nodes()[source_return]["elevation"])
-    #
-    #     #sort by elevation
-    #     sink_return = dict(sorted(sink_return.items(), key=lambda item: item[1],reverse=True))
-    #
-    #     #select from last 100
-    #     sink_selected = random.choice(list(sink_return.keys()))
-    #
-    #     #set sink to the selected
-    #     run_mincostflow.set_node_supply(u_i.get(sink_selected),-1) #far away place
-    #
-    #     # Run the min cost flow algorithm
-    #     if run_mincostflow.solve() == run_mincostflow.OPTIMAL:
-    #         # Print the total cost and flow on each edge
-    #         total_cost = run_mincostflow.optimal_cost()
-    #
-    #         nodes_ij = []
-    #         for w in range(run_mincostflow.num_arcs()):
-    #             u = run_mincostflow.tail(w)
-    #             v = run_mincostflow.head(w)
-    #             flow = run_mincostflow.flow(w)
-    #             cost = run_mincostflow.unit_cost(w)
-    #
-    #             if flow > 0:
-    #                 #st.write(f'Edge ({u}, {v}): Flow = {flow}, Cost = {cost}')
-    #                 nodes_ij.append(i_u.get(u))
-    #                 nodes_ij.append(i_u.get(v))
-    #
-    #         sub = st.session_state["running_graph"].subgraph(nodes_ij)
-    #         results.append([sub,source_return,sink_selected,total_cost])
-    #
-    #     results.sort(key = lambda row: row[3])
-    #     st.session_state["sub"] = results[0][0]
-    #     st.session_state["source"] = results[0][1]
-    #     st.session_state["sink"] = results[0][2]
-    #
-    #     #return results[0][:3]
 def main():
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
@@ -249,26 +159,35 @@ def main():
 
     st.subheader("Running Routes")
 
-    map_mode = st.toggle("Select Start Location Via Map")
+    map_mode = st.toggle("Select Start Location Via Map", key="select_map")
 
     address = None
+    location = get_geolocation()
+    if location is not None:
+        if map_mode:
 
-    if map_mode:
-        m = folium.Map(location=geocoder.ip('me').latlng,zoom_start=13,tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
+            m = folium.Map(location=[location["coords"]["latitude"],location["coords"]["longitude"]],zoom_start=15,tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
 
-        folium.LatLngPopup().add_to(m)
-        user_location_input = streamlit_folium.st_folium(m)
+            folium.LatLngPopup().add_to(m)
+            user_location_input = streamlit_folium.st_folium(m)
 
-        if user_location_input["last_clicked"] != None:
-            address = [user_location_input["last_clicked"]["lat"],user_location_input["last_clicked"]["lng"]]
-            folium.Marker(address).add_to(m)
-    else:
-        address = streamlit_searchbox.st_searchbox(search_function=pelias_autocomplete)
+            if user_location_input["last_clicked"] != None:
+                address = [user_location_input["last_clicked"]["lat"],user_location_input["last_clicked"]["lng"]]
+                folium.Marker(address).add_to(m)
+        else:
+            @st.cache_data()
+            def get_add():
+                default_add = geocode.pelias_reverse(client, [location["coords"]["longitude"],location["coords"]["latitude"]])
+                default_add = default_add["features"][0]["properties"]["label"]
+                return default_add
 
-    #test folium entry
-    st.number_input("Desired Mileage", value=3, key="mileage")
-    #run  model
-    st.button("Go!",on_click=build_graph,args=[address, map_mode])
+
+            address = streamlit_searchbox.st_searchbox(label="Address of Start Location",search_function=pelias_autocomplete, placeholder=get_add(), default=get_add())
+
+        #test folium entry
+        st.number_input("Desired Mileage", value=3, key="mileage")
+        #run  model
+        st.button("Generate Routes",on_click=build_graph,args=[address, map_mode])
 
     if st.session_state["sub"] is not None:
         sub = st.session_state["sub"]
