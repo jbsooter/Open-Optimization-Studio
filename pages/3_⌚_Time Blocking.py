@@ -380,7 +380,6 @@ as a dataframe. This result is saved in session_state.
     for i,x in df.iterrows():
         event = icalendar.Event()
         event["dtstart"] = icalendar.vDatetime(pd.to_datetime(x["Start Date"] + " " +  x["Start Time"]))
-        st.write(event["dtstart"])
         event["dtend"] = icalendar.vDatetime(pd.to_datetime(x["End Date"]+ " " +x["End Time"]))
         event["summary"] =x["Subject"]
 

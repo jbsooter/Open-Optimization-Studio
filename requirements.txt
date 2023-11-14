@@ -16,3 +16,5 @@ pandas
 scipy
 geopandas
 shapely
+geocoder
+streamlit-js-eval
