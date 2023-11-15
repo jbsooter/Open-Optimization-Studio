@@ -1,8 +1,11 @@
+import datetime
 import random
 import geopandas
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
+import pandas as pd
+import requests
 import streamlit as st
 import streamlit_folium
 import folium
@@ -43,19 +46,19 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
-            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["address_coords"] = address
 
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                                                   simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["select_map"] = False
         else:
             # query osm
-            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False)
     with st.spinner(text="Requesting Elevation Data"):
         #snippet to add elevation to entire graph.
         osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
@@ -138,6 +141,37 @@ def build_route():
     st.session_state["source"] = results[0][1]
     st.session_state["sink"] = results[0][2]
 
+def nws_api():
+    #weather
+    URL = 'https://api.weather.gov/zones/forecast/MNZ060/forecast'
+    URL = f'https://api.weather.gov/points/{st.session_state["address_coords"][0]},{st.session_state["address_coords"][1]}'
+
+    response = requests.get(URL)
+
+    URL = response.json()['properties']['forecastHourly']
+    response = requests.get(URL)
+
+
+    # Limiting to the first 10 periods
+    response_json = response.json()
+
+    md_table = ""
+    # Extract times and data
+    times = [datetime.datetime.fromisoformat(x["startTime"]).strftime("%I:%M %p") for x in response_json['properties']['periods'][:12]]
+    temperatures = [str(x["temperature"]) for x in response_json['properties']['periods'][:12]]
+    humidities = [str(x['relativeHumidity']['value']) for x in response_json['properties']['periods'][:12]]
+    wind_speeds = [x['windSpeed'] for x in response_json['properties']['periods'][:12]]
+    short_forecasts = [x['shortForecast'] for x in response_json['properties']['periods'][:12]]
+
+
+    # Create a grid layout with the header row
+    md_table += ("| Time | Temperature (F) | Humidity (%) | Wind Speed (mph) | Short Forecast |\n")
+    md_table += ("| --- | --- | --- | --- | --- |\n")
+
+    # Display data in each row
+    for i in range(12):
+        md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
+    return md_table
 def main():
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
@@ -195,10 +229,13 @@ def main():
         sink = st.session_state["sink"]
         map_location = st.container()
 
-        total_length = 10000000000
-        route = []
+        total_length = 0
+        route = osmnx.shortest_path(sub,source, sink)
 
-        while total_length/1609.34 > 1.0000001*st.session_state["mileage"]:
+        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
+            total_length += edge_data['length']*2.0
+
+        while total_length/1609.34 > 1.001*st.session_state["mileage"]:
             total_length_old = total_length
             route_old = route
             sub_old = sub
@@ -210,13 +247,13 @@ def main():
             for u,v,  key, edge_data in sub.edges(keys=True, data=True):
                 total_length += edge_data['length']
 
-            if(total_length/1609.34 < st.session_state["mileage"]):
+            if((total_length)/1609.34 < st.session_state["mileage"]):
                 route = route_old
                 total_length = total_length_old
                 sub = sub_old
                 break
             else:
-                sink = route[-2]
+                sink = route[-2] #last becomes previous second to last
 
 
         nodes, edges = osmnx.graph_to_gdfs(sub)
@@ -244,6 +281,8 @@ def main():
             gdf1.to_file(file_mem,'GPX')
             st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
 
+            with st.expander("Weather Report"):
+                st.markdown(nws_api())
 
 if __name__ == "__main__":
     main()
