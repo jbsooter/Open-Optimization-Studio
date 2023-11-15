@@ -43,19 +43,19 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
-            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["address_coords"] = address
 
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                                                                                   simplify=False, retain_all=False, truncate_by_edge=False)
             st.session_state["select_map"] = False
         else:
             # query osm
-            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
+            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
+                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False)
     with st.spinner(text="Requesting Elevation Data"):
         #snippet to add elevation to entire graph.
         osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
@@ -195,10 +195,13 @@ def main():
         sink = st.session_state["sink"]
         map_location = st.container()
 
-        total_length = 10000000000
-        route = []
+        total_length = 0
+        route = osmnx.shortest_path(sub,source, sink)
 
-        while total_length/1609.34 > 1.0000001*st.session_state["mileage"]:
+        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
+            total_length += edge_data['length']*2.0
+
+        while total_length/1609.34 > 1.001*st.session_state["mileage"]:
             total_length_old = total_length
             route_old = route
             sub_old = sub
@@ -210,13 +213,13 @@ def main():
             for u,v,  key, edge_data in sub.edges(keys=True, data=True):
                 total_length += edge_data['length']
 
-            if(total_length/1609.34 < st.session_state["mileage"]):
+            if((total_length)/1609.34 < st.session_state["mileage"]):
                 route = route_old
                 total_length = total_length_old
                 sub = sub_old
                 break
             else:
-                sink = route[-2]
+                sink = route[-2] #last becomes previous second to last
 
 
         nodes, edges = osmnx.graph_to_gdfs(sub)
