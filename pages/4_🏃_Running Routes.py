@@ -1,8 +1,11 @@
+import datetime
 import random
 import geopandas
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
+import pandas as pd
+import requests
 import streamlit as st
 import streamlit_folium
 import folium
@@ -138,6 +141,37 @@ def build_route():
     st.session_state["source"] = results[0][1]
     st.session_state["sink"] = results[0][2]
 
+def nws_api():
+    #weather
+    URL = 'https://api.weather.gov/zones/forecast/MNZ060/forecast'
+    URL = f'https://api.weather.gov/points/{st.session_state["address_coords"][0]},{st.session_state["address_coords"][1]}'
+
+    response = requests.get(URL)
+
+    URL = response.json()['properties']['forecastHourly']
+    response = requests.get(URL)
+
+
+    # Limiting to the first 10 periods
+    response_json = response.json()
+
+    md_table = ""
+    # Extract times and data
+    times = [datetime.datetime.fromisoformat(x["startTime"]).strftime("%I:%M %p") for x in response_json['properties']['periods'][:12]]
+    temperatures = [str(x["temperature"]) for x in response_json['properties']['periods'][:12]]
+    humidities = [str(x['relativeHumidity']['value']) for x in response_json['properties']['periods'][:12]]
+    wind_speeds = [x['windSpeed'] for x in response_json['properties']['periods'][:12]]
+    short_forecasts = [x['shortForecast'] for x in response_json['properties']['periods'][:12]]
+
+
+    # Create a grid layout with the header row
+    md_table += ("| Time | Temperature (F) | Humidity (%) | Wind Speed (mph) | Short Forecast |\n")
+    md_table += ("| --- | --- | --- | --- | --- |\n")
+
+    # Display data in each row
+    for i in range(12):
+        md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
+    return md_table
 def main():
     #initialize locaiton in session state
     if 'running_graph' not in st.session_state:
@@ -247,6 +281,8 @@ def main():
             gdf1.to_file(file_mem,'GPX')
             st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
 
+            with st.expander("Weather Report"):
+                st.markdown(nws_api())
 
 if __name__ == "__main__":
     main()
