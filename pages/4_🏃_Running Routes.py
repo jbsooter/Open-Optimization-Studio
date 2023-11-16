@@ -66,84 +66,89 @@ def build_graph(address,map_mode):
     build_route()
 
 def cost_function(way,start_node,end_node):
+    turn_cost = 50
+    speed_cost = 50
+    elevation_cost = 50
+    type_cost = 50
     #https://taginfo.openstreetmap.org/keys
-    cost = 10000
+    cost = 0
 
     #if length is less than 500 metres, penalize to reduce tons of turns
     if "length" in way:
-        if st.session_state["turn_penalty"] is "Linear":
-            if st.session_state["turn_type"] is "Many Turns":
+        if st.session_state["turn_penalty"] =="Linear":
+            if st.session_state["turn_type"] == "Many Turns":
                 if int(way["length"]) < 500:
-                    cost = cost - 300
+                    turn_cost -= 3
                 elif int(way["length"]) < 1000:
-                    cost = cost - 200
+                    turn_cost -= 2
                 elif int(way["length"]) < 1500:
-                    cost = cost - 100
-            elif st.session_state["turn_type"] is "Few Turns":
+                    turn_cost -= 1
+            elif st.session_state["turn_type"] == "Few Turns":
                 if int(way["length"]) < 500:
-                    cost = cost + 300
+                    turn_cost += 3
                 elif int(way["length"]) < 1000:
-                    cost = cost + 200
+                    turn_cost += 2
                 elif int(way["length"]) < 1500:
-                    cost = cost + 100
-        elif st.session_state["turn_penalty"] is "Exponential":
-            if st.session_state["turn_type"] is "Many Turns":
+                    turn_cost += 1
+        elif st.session_state["turn_penalty"] == "Exponential":
+            if st.session_state["turn_type"] == "Many Turns":
                 if int(way["length"]) < 500:
-                    cost = cost - math.pow(300,2)
+                    turn_cost -= math.pow(3,2)
                 elif int(way["length"]) < 1000:
-                    cost = cost - math.pow(200,2)
+                    turn_cost -= math.pow(2,2)
                 elif int(way["length"]) < 1500:
-                    cost = cost - math.pow(100,2)
-            elif st.session_state["turn_type"] is "Few Turns":
+                    turn_cost -= math.pow(1,2)
+            elif st.session_state["turn_type"] == "Few Turns":
                 if int(way["length"]) < 500:
-                    cost = cost + math.pow(300,2)
+                    turn_cost += math.pow(3,2)
                 elif int(way["length"]) < 1000:
-                    cost = cost + math.pow(200,2)
+                    turn_cost += math.pow(2,2)
                 elif int(way["length"]) < 1500:
-                    cost = cost + math.pow(100,2)
+                    turn_cost += math.pow(1,2)
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         if int(way["maxspeed"][:2]) < st.session_state["speed_restriction"]:
-            cost = cost - 1000
+            speed_cost -= 50
         if int(way["maxspeed"][:2]) > st.session_state["speed_restriction"]:
-            cost = cost + 1000
+            speed_cost += 50
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
-            cost = cost + 1000
+            type_cost += 50
         if way["highway"] in ["service","residential","unclassified"]:
-            cost += 0
+            type_cost += 0
         #prefer cycleways
         if st.session_state["greenway_preference"]:
             if way["highway"]  in ["cycleway","pedestrian","track","footway","tertiary","path","crossing"]:
-                cost = cost - 1000
+                type_cost  -= 50
     #make expensive if not designated foot
     if "foot" in way:
         #if way["foot"] not in ["designated","yes"]:
-        cost = cost - 1000
+        type_cost -= 50
 
     #add 100x grade to cost per way
     if "elevation" in start_node:
         if "elevation" in end_node:
-            if st.session_state["elevation_penalty"] is "Linear":
-                if st.session_state["elevation_type"] is "Flat":
-                    cost = cost + 100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-                elif st.session_state["elevation_type"] is "Steep":
-                    cost = cost - 100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-                elif st.session_state["elevation_type"] is "Rolling":
-                    cost += 0 #temp
-            elif st.session_state["elevation_penalty"] is "Exponential":
-                if st.session_state["elevation_type"] is "Flat":
-                    cost = cost + 100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
-                elif st.session_state["elevation_type"] is "Steep":
-                    cost = cost - 100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
-                elif st.session_state["elevation_type"] is "Rolling":
-                    cost += 0 #temp
+            if st.session_state["elevation_penalty"] == "Linear":
+                if st.session_state["elevation_type"] == "Flat":
+                    elevation_cost +=  100*np.absolute((end_node["elevation"] - start_node["elevation"]))
+                elif st.session_state["elevation_type"] == "Steep":
+                    elevation_cost -= 100*np.absolute((end_node["elevation"] - start_node["elevation"]))
+                elif st.session_state["elevation_type"] == "Rolling":
+                    elevation_cost -= 0
+            elif st.session_state["elevation_penalty"] == "Exponential":
+                if st.session_state["elevation_type"] == "Flat":
+                    elevation_cost += 100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])),2)
+                elif st.session_state["elevation_type"] == "Steep":
+                    elevation_cost -=  100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])),2)
+                elif st.session_state["elevation_type"] == "Rolling":
+                    elevation_cost += 0
+    cost = (0.25*elevation_cost + 0.25*turn_cost + 0.25*type_cost + 0.25*speed_cost)
     #No negative costs
-    if cost*way['length'] <= 0:
+    if cost <= 0:
         return 0
     else:
-        return cost*way["length"]
+        return cost
 
 def build_route():
     #test shortest path only
@@ -158,22 +163,40 @@ def build_route():
         #get node ids that are on the last graph 1-mi of the considered area
         result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
 
-        sink_selected = random.choice(result)
-
+        #sink_selected = random.choice(result)
+        sink_selected = result[0]
         route = osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
         sub = st.session_state["running_graph"].subgraph(route)
 
+        total_length = 0
         total_cost = 0
-        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-            total_cost += edge_data['cost']
-        results.append([sub,source_return,sink_selected,total_cost])
+
+        #cut the route down to exact mileage
+        route_cut = []
+        for i in range(0, len(route)-1):
+            if total_length/1609.34 <= st.session_state["mileage"]:
+                u = route[i]
+                v = route[i + 1]
+                route_cut.append(u)
+
+                if sub.has_edge(u, v):
+                    total_length += st.session_state["running_graph"][u][v][0]["length"]*2
+
+            else:
+                break
+
+        sub = sub.subgraph(route_cut)
+        sink_selected = route_cut[-1]
+        results.append([sub,source_return,sink_selected,total_cost, total_length])
 
 
     results.sort(key = lambda row: row[3])
     st.session_state["sub"] = results[0][0]
     st.session_state["source"] = results[0][1]
     st.session_state["sink"] = results[0][2]
+    st.session_state["route"] = route
+    st.session_state["length_running"] = results[0][4]
 
 def nws_api():
     #weather
@@ -222,6 +245,12 @@ def main():
 
     if 'sink' not in st.session_state:
         st.session_state['sink'] = None
+
+    if 'length_running' not in st.session_state:
+        st.session_state['length_running'] = None
+
+    if 'route' not in st.session_state:
+        st.session_state['route'] = None
     if 'uli' not in st.session_state:
         st.session_state['uli'] = None
 
@@ -233,7 +262,7 @@ def main():
         with col1:
             st.radio("Grade Preference", ["Flat","Steep","Rolling"],key="elevation_type")
             st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
-            st.number_input("Avoid Roads with Speed Limit >", value=40,key="speed_restriction")
+            st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
 
         with col2:
             st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
@@ -278,33 +307,7 @@ def main():
         sink = st.session_state["sink"]
         map_location = st.container()
 
-        total_length = 0
-        route = osmnx.shortest_path(sub,source, sink)
-
-        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-            total_length += edge_data['length']*2.0
-
-        while total_length/1609.34 > 1.000000001*st.session_state["mileage"]:
-            total_length_old = total_length
-            route_old = route
-            sub_old = sub
-            total_length = 0
-
-            route = osmnx.shortest_path(sub,source, sink)
-            sub = sub.subgraph(route)
-
-
-            for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-                total_length += edge_data['length']
-
-            if((total_length)/1609.34 < st.session_state["mileage"]):
-                route = route_old
-                total_length = total_length_old
-                sub = sub_old
-                break
-            else:
-                sink = route[-2] #last becomes previous second to last
-
+        route = osmnx.shortest_path(sub,source, sink, weight="cost")
 
         nodes, edges = osmnx.graph_to_gdfs(sub)
 
@@ -320,7 +323,7 @@ def main():
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-            st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
+            st.write(f'Total Distance Out and Back: {np.round(st.session_state["length_running"]/1609.34,2)}') #meter to mile conversion
             with map_location:
                 col1,col2 = st.columns([2,1])
                 with col1:
