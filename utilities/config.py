@@ -73,7 +73,8 @@ running_opts = dict(
 ,
     gpx_file_name = "route.gpx",
     out_back_node_n = 10,
-    osmnx_network_type = "all"
+    osmnx_network_filters = ["""["highway" ~ "footway|sidewalk|footpath|path|residential"]""","""["foot" ~ "designated|yes"]"""]
+    #["""["highway" ~ "footway|sidewalk|footpath|path|residential"]"""]#,
 )
 
 # Knapsack Options
