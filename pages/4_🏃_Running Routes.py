@@ -4,10 +4,12 @@ import random
 import time
 
 import geopandas
+import gpxpy as gpxpy
 import networkx as nx
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
+import pandas as pd
 import requests
 import streamlit as st
 import streamlit_folium
@@ -18,6 +20,7 @@ from openrouteservice import geocode
 from shapely import LineString
 from io import BytesIO
 
+from shapely.ops import substring
 from streamlit_js_eval import get_geolocation
 
 from utilities import config
@@ -266,29 +269,11 @@ def nws_api():
         md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
     return md_table
 def main():
-    #initialize locaiton in session state
-    if 'running_graph' not in st.session_state:
-        st.session_state['running_graph'] = None
+    state_vars = ['running_graph', 'address_coords', 'sub', 'source', 'sink', 'length_running', 'route']
 
-    if 'address_coords' not in st.session_state:
-        st.session_state['address_coords'] = None
-
-    if 'sub' not in st.session_state:
-        st.session_state['sub'] = None
-
-    if 'source' not in st.session_state:
-        st.session_state['source'] = None
-
-    if 'sink' not in st.session_state:
-        st.session_state['sink'] = None
-
-    if 'length_running' not in st.session_state:
-        st.session_state['length_running'] = None
-
-    if 'route' not in st.session_state:
-        st.session_state['route'] = None
-    if 'uli' not in st.session_state:
-        st.session_state['uli'] = None
+    for var in state_vars:
+        if var not in st.session_state:
+            st.session_state[var] = None
 
     st.subheader("Running Routes")
 
@@ -339,13 +324,10 @@ def main():
 
     if st.session_state["sub"] is not None:
         sub = st.session_state["sub"]
-        source = st.session_state["source"]
-        sink = st.session_state["sink"]
         map_location = st.container()
 
-        #route = osmnx.shortest_path(sub,source, sink, weight="cost")
         route = st.session_state["route"]
-        nodes, edges = osmnx.graph_to_gdfs(sub)
+        nodes, edges = osmnx.graph_to_gdfs(sub, nodes=True, node_geometry=True)
 
         #out and back, reverse shortest path nodes list and append
         route_2 = route.copy()
@@ -353,7 +335,7 @@ def main():
         route = route + route_2
         route_nodes = nodes.loc[route]
 
-        route_line = LineString(route_nodes['geometry'].tolist())
+        route_line = LineString([(point.x, point.y, point.elevation) for point in route_nodes.itertuples()])
 
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
@@ -372,15 +354,6 @@ def main():
 
             with st.expander("Weather Report"):
                 st.markdown(nws_api())
-            with st.expander("Elevation Profile"):
-                data = []
-                for x in route:
-                    data.append(st.session_state["running_graph"].nodes(data=True)[x])
-                    # Extract the elevation values
-                elevation_values = [entry["elevation"] for entry in data]
-
-                    # Create a line chart using Streamlit
-                st.line_chart(elevation_values)
 
 if __name__ == "__main__":
     main()
