@@ -4,12 +4,10 @@ import random
 import time
 
 import geopandas
-import gpxpy as gpxpy
 import networkx as nx
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
-import pandas as pd
 import requests
 import streamlit as st
 import streamlit_folium
