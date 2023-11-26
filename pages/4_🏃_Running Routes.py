@@ -56,9 +56,9 @@ def build_graph(address,map_mode):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                rgs.append(osmnx.graph_from_point(address, dist=1.4*st.session_state["mileage"]*1609.34/2, dist_type='network',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(1.5*st.session_state["mileage"])*1609.34/2, dist_type='network',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -71,10 +71,10 @@ def build_graph(address,map_mode):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.5*st.session_state["mileage"]*1609.34/2, dist_type='network',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(1.4*st.session_state["mileage"])*1609.34/2, dist_type='network',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -127,10 +127,13 @@ def cost_function(way,start_node,end_node):
                     turn_cost += math.pow(8,2)
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
-        if int(way["maxspeed"][:2]) < st.session_state["speed_restriction"]:
-            speed_cost -= 100
-        if int(way["maxspeed"][:2]) > st.session_state["speed_restriction"]:
-            speed_cost += 100
+        try:
+            if int(way["maxspeed"][:2]) < st.session_state["speed_restriction"]:
+                speed_cost -= 100
+            if int(way["maxspeed"][:2]) > st.session_state["speed_restriction"]:
+                speed_cost += 100
+        except TypeError:
+            int()
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
@@ -142,9 +145,9 @@ def cost_function(way,start_node,end_node):
             if way["highway"]  in ["cycleway"]:#,"pedestrian","track","footway","path"]:
                 type_cost  -= 100
 
-    if "foot" in way:
-        if way["foot"] in ["designated","yes"]:
-            type_cost -= 100
+            if "foot" in way:
+                if way["foot"] in ["designated","yes"]:
+                    type_cost -= 100
 
     #add 100x grade to cost per way
     if "elevation" in start_node:
@@ -171,69 +174,76 @@ def cost_function(way,start_node,end_node):
         return cost*way["length"] #more costly if lasts longer debating this
 
 def build_route():
-    #test shortest path only
-    results = []
-    for i in range(0,config.running_opts["out_back_node_n"]):
-        for u, v, data in st.session_state["running_graph"].edges(data=True):
-            data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
+    with st.spinner("Computing Routes"):
+        #test shortest path only
+        results = []
+        for i in range(0,config.running_opts["out_back_node_n"]):
+            for u, v, data in st.session_state["running_graph"].edges(data=True):
+                data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
 
-        # set source and sink
-        source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+            # set source and sink
+            source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
 
-        #get node ids that are on the last graph 1-mi of the considered area
-        result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
+            #get node ids that are on the last graph 1-mi of the considered area
+            rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
+            osmnx.simplify_graph(rg_local)
 
-        #new seed based on time
-        current_time = int(time.time())
-        random.seed(current_time)
-        sink_selected = random.choice(result)
-        #sink_selected = result[0]
-        def sp(source_return, sink_selected):
-            return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
+            rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
+            osmnx.simplify_graph(rbg_local)
+            result = [i for i in rg_local if i not in rbg_local]
 
-        #route = NoneType
-        while True:
-            route = sp(source_return, sink_selected)
-            try:
-                len(route)
-                break
-            except TypeError:
-                #st.write("hit")
-                sink_selected = random.choice(result)
+            #new seed based on time
+            current_time = int(time.time())
+            random.seed(current_time)
+            sink_selected = random.choice(result)
+            #sink_selected = result[0]
+            def sp(source_return, sink_selected):
+                return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
-        sub = st.session_state["running_graph"].subgraph(route)
+            #route = NoneType
+            while True:
+                route = sp(source_return, sink_selected)
+                try:
+                    len(route)
+                    break
+                except TypeError:
+                    #st.write("hit")
+                    sink_selected = random.choice(result)
 
-        total_length = 0
-        total_cost = 0
+            sub = st.session_state["running_graph"].subgraph(route)
 
-        #cut the route down to exact mileage
-        route_cut = []
-        for i in range(0, len(route)-1):
-            if total_length/1609.34 <= st.session_state["mileage"]:
-                u = route[i]
-                v = route[i + 1]
-                route_cut.append(u)
+            total_length = 0
+            total_cost = 0
 
-                if sub.has_edge(u, v):
-                    total_length += st.session_state["running_graph"][u][v][0]["length"]*2
-                    total_cost += st.session_state["running_graph"][u][v][0]["cost"]
+            #cut the route down to exact mileage
+            route_cut = []
+            for i in range(0, len(route)-1):
+                if total_length/1609.34 <= st.session_state["mileage"]:
+                    u = route[i]
+                    v = route[i + 1]
+                    route_cut.append(u)
 
-            else:
-                #route_cut.append(route[i-1])
-                total_length -= st.session_state["running_graph"][route[i-2]][route[i-1]][0]["length"]*2
-                break
+                    if sub.has_edge(u, v):
+                        total_length += st.session_state["running_graph"][u][v][0]["length"]*2
+                        total_cost += st.session_state["running_graph"][u][v][0]["cost"]
 
-        sub = sub.subgraph(route_cut)
-        sink_selected = route_cut[-1]
+                else:
+                    #route_cut.append(route[i-1])
+                    total_length -= st.session_state["running_graph"][route[i-2]][route[i-1]][0]["length"]*2
+                    break
 
-        results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+            sub = sub.subgraph(route_cut)
+            sink_selected = route_cut[-1]
 
-    results.sort(key = lambda row: row[3])
-    st.session_state["sub"] = results[0][0]
-    st.session_state["source"] = results[0][1]
-    st.session_state["sink"] = results[0][2]
-    st.session_state["route"] = results[0][5]
-    st.session_state["length_running"] = results[0][4]
+            results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+
+        #results.sort(key = lambda row: row[3])
+        random.shuffle(results)
+        st.session_state["sub"] = results[0][0]
+        st.session_state["source"] = results[0][1]
+        st.session_state["sink"] = results[0][2]
+        st.session_state["route"] = results[0][5]
+        st.session_state["length_running"] = results[0][4]
 
 @st.cache_data(ttl=15*60) #refresh 15 min
 def nws_api():
