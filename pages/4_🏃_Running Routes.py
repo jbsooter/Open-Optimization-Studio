@@ -1,10 +1,13 @@
 import datetime
+import math
 import random
+import time
+
 import geopandas
+import networkx as nx
 import numpy as np
 import openrouteservice
 import osmnx as osmnx
-import pandas as pd
 import requests
 import streamlit as st
 import streamlit_folium
@@ -15,6 +18,7 @@ from openrouteservice import geocode
 from shapely import LineString
 from io import BytesIO
 
+from shapely.ops import substring
 from streamlit_js_eval import get_geolocation
 
 from utilities import config
@@ -25,6 +29,8 @@ osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'n
                                  'landuse', 'width', 'est_width', 'junction', 'surface','length','foot']
 
 osmnx.settings.useful_tags_node = ['name','lit','amenity']
+
+osmnx.settings.bidirectional_network_types = ['all']
 
 #retrieve client
 # ORS client to be shared among all methods
@@ -46,19 +52,33 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
 def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
-            st.session_state["running_graph"] = osmnx.graph_from_point(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                                                                             simplify=False, retain_all=False, truncate_by_edge=False)
-            st.session_state["address_coords"] = address
+            rgs = []
+            rgs_b = []
+            #combine all the filtered data thats requested
+            for x in config.running_opts["osmnx_network_filters"]:
+                rgs.append(osmnx.graph_from_point(address, dist=1.4*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                                                                                                             simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
+                rgs_b.append(osmnx.graph_from_point(address, dist=(1.5*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                                                                                    simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
+            #compose graphs and save in sess st
+            st.session_state["running_graph"] = nx.compose_all(rgs)
+            st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
 
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_point(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                                                                                  simplify=False, retain_all=False, truncate_by_edge=False)
+            st.session_state["address_coords"] = address
             st.session_state["select_map"] = False
         else:
             # query osm
-            st.session_state["running_graph"], st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.3*st.session_state["mileage"]*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True)
-            st.session_state["running_boundary_graph"] = osmnx.graph_from_address(address, dist=(1.2*st.session_state["mileage"])*1609.34/2, dist_type='network',network_type=config.running_opts["osmnx_network_type"],
-                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False)
+            rgs = []
+            rgs_b = []
+            for x in config.running_opts["osmnx_network_filters"]:
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.5*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                                                             simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
+                rgs.append(r_i)
+                rgs_b.append(osmnx.graph_from_address(address, dist=(1.4*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                                                                                simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
+            st.session_state["running_graph"] = nx.compose_all(rgs)
+            st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
+
     with st.spinner(text="Requesting Elevation Data"):
         #snippet to add elevation to entire graph.
         osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
@@ -66,84 +86,168 @@ def build_graph(address,map_mode):
     build_route()
 
 def cost_function(way,start_node,end_node):
+    #all 100 to make easier to track weights
+    turn_cost = 100
+    speed_cost = 100
+    elevation_cost = 100
+    type_cost = 100
     #https://taginfo.openstreetmap.org/keys
-    cost = 1000
 
     #if length is less than 500 metres, penalize to reduce tons of turns
     if "length" in way:
-        if int(way["length"]) < 500:
-            cost = cost + 500
-        elif int(way["length"]) < 1000:
-            cost = cost + 200
-        elif int(way["length"]) < 1500:
-            cost = cost + 100
-
+        if st.session_state["turn_penalty"] =="Linear":
+            if st.session_state["turn_type"] == "Many Turns":
+                if int(way["length"]) < 500:
+                    turn_cost -= 100
+                elif int(way["length"]) < 1000:
+                    turn_cost -= 75
+                elif int(way["length"]) < 1500:
+                    turn_cost -= 50
+            elif st.session_state["turn_type"] == "Few Turns":
+                if int(way["length"]) < 500:
+                    turn_cost += 100
+                elif int(way["length"]) < 1000:
+                    turn_cost += 75
+                elif int(way["length"]) < 1500:
+                    turn_cost += 50
+        elif st.session_state["turn_penalty"] == "Exponential":
+            if st.session_state["turn_type"] == "Many Turns":
+                if int(way["length"]) < 500:
+                    turn_cost -= math.pow(10,2)
+                elif int(way["length"]) < 1000:
+                    turn_cost -= math.pow(9,2)
+                elif int(way["length"]) < 1500:
+                    turn_cost -= math.pow(8,2)
+            elif st.session_state["turn_type"] == "Few Turns":
+                if int(way["length"]) < 500:
+                    turn_cost += math.pow(10,2)
+                elif int(way["length"]) < 1000:
+                    turn_cost += math.pow(9,2)
+                elif int(way["length"]) < 1500:
+                    turn_cost += math.pow(8,2)
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
-        if int(way["maxspeed"][:2]) < 30:
-            cost = cost - 250
-        if int(way["maxspeed"][:2]) > 50:
-            cost = cost + 750
-    else: #some side roads have no value
-        cost = cost - 10
+        try:
+            if int(way["maxspeed"][:2]) < st.session_state["speed_restriction"]:
+                speed_cost -= 100
+            if int(way["maxspeed"][:2]) > st.session_state["speed_restriction"]:
+                speed_cost += 100
+        except TypeError:
+            int()
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
-            cost = cost + 500
+            type_cost += 100
         if way["highway"] in ["service","residential","unclassified"]:
-            cost = cost + 300
+            type_cost += 0
         #prefer cycleways
-        if way["highway"]  in ["cycleway","pedestrian","track","footway","tertiary","path","crossing"]:
-            cost = cost - 500
-    #make expensive if not designated foot
-    if "foot" in way:
-        #if way["foot"] not in ["designated","yes"]:
-        cost = cost - 500
+        if st.session_state["greenway_preference"]:
+            if way["highway"]  in ["cycleway"]:#,"pedestrian","track","footway","path"]:
+                type_cost  -= 100
+
+            if "foot" in way:
+                if way["foot"] in ["designated","yes"]:
+                    type_cost -= 100
 
     #add 100x grade to cost per way
     if "elevation" in start_node:
         if "elevation" in end_node:
-            cost = cost + 100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-
+            if st.session_state["elevation_penalty"] == "Linear":
+                if st.session_state["elevation_type"] == "Flat":
+                    elevation_cost +=  100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                elif st.session_state["elevation_type"] == "Steep":
+                    elevation_cost -= 100*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                elif st.session_state["elevation_type"] == "Rolling":
+                    elevation_cost -= 0
+            elif st.session_state["elevation_penalty"] == "Exponential":
+                if st.session_state["elevation_type"] == "Flat":
+                    elevation_cost += 100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
+                elif st.session_state["elevation_type"] == "Steep":
+                    elevation_cost -=  100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
+                elif st.session_state["elevation_type"] == "Rolling":
+                    elevation_cost += 0
+    cost = (0.25*elevation_cost + 0.25*turn_cost + 0.25*type_cost + 0.25*speed_cost)
     #No negative costs
-    if cost*way['length'] <= 0:
+    if cost <= 0:
         return 0
     else:
-        return cost*way["length"]
+        return cost*way["length"] #more costly if lasts longer debating this
 
 def build_route():
-    #test shortest path only
-    results = []
-    for i in range(0,config.running_opts["out_back_node_n"]):
-        for u, v, data in st.session_state["running_graph"].edges(data=True):
-            data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
+    with st.spinner("Computing Routes"):
+        #test shortest path only
+        results = []
+        for i in range(0,config.running_opts["out_back_node_n"]):
+            for u, v, data in st.session_state["running_graph"].edges(data=True):
+                data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
 
-        # set source and sink
-        source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+            # set source and sink
+            source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
 
-        #get node ids that are on the last graph 1-mi of the considered area
-        result = [i for i in st.session_state["running_graph"] if i not in st.session_state["running_boundary_graph"]]
+            #get node ids that are on the last graph 1-mi of the considered area
+            rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
+            osmnx.simplify_graph(rg_local)
 
-        sink_selected = random.choice(result)
+            rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
+            osmnx.simplify_graph(rbg_local)
+            result = [i for i in rg_local if i not in rbg_local]
 
-        route = osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
+            #new seed based on time
+            current_time = int(time.time())
+            random.seed(current_time)
+            sink_selected = random.choice(result)
+            #sink_selected = result[0]
+            def sp(source_return, sink_selected):
+                return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
-        sub = st.session_state["running_graph"].subgraph(route)
+            #route = NoneType
+            while True:
+                route = sp(source_return, sink_selected)
+                try:
+                    len(route)
+                    break
+                except TypeError:
+                    #st.write("hit")
+                    sink_selected = random.choice(result)
 
-        total_cost = 0
-        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-            total_cost += edge_data['cost']
-        results.append([sub,source_return,sink_selected,total_cost])
+            sub = st.session_state["running_graph"].subgraph(route)
 
+            total_length = 0
+            total_cost = 0
 
-    results.sort(key = lambda row: row[3])
-    st.session_state["sub"] = results[0][0]
-    st.session_state["source"] = results[0][1]
-    st.session_state["sink"] = results[0][2]
+            #cut the route down to exact mileage
+            route_cut = []
+            for i in range(0, len(route)-1):
+                if total_length/1609.34 <= st.session_state["mileage"]:
+                    u = route[i]
+                    v = route[i + 1]
+                    route_cut.append(u)
 
+                    if sub.has_edge(u, v):
+                        total_length += st.session_state["running_graph"][u][v][0]["length"]*2
+                        total_cost += st.session_state["running_graph"][u][v][0]["cost"]
+
+                else:
+                    #route_cut.append(route[i-1])
+                    total_length -= st.session_state["running_graph"][route[i-2]][route[i-1]][0]["length"]*2
+                    break
+
+            sub = sub.subgraph(route_cut)
+            sink_selected = route_cut[-1]
+
+            results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+
+        #results.sort(key = lambda row: row[3])
+        random.shuffle(results)
+        st.session_state["sub"] = results[0][0]
+        st.session_state["source"] = results[0][1]
+        st.session_state["sink"] = results[0][2]
+        st.session_state["route"] = results[0][5]
+        st.session_state["length_running"] = results[0][4]
+
+@st.cache_data(ttl=15*60) #refresh 15 min
 def nws_api():
     #weather
-    URL = 'https://api.weather.gov/zones/forecast/MNZ060/forecast'
     URL = f'https://api.weather.gov/points/{st.session_state["address_coords"][0]},{st.session_state["address_coords"][1]}'
 
     response = requests.get(URL)
@@ -173,25 +277,28 @@ def nws_api():
         md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
     return md_table
 def main():
-    #initialize locaiton in session state
-    if 'running_graph' not in st.session_state:
-        st.session_state['running_graph'] = None
+    state_vars = ['running_graph', 'address_coords', 'sub', 'source', 'sink', 'length_running', 'route']
 
-    if 'address_coords' not in st.session_state:
-        st.session_state['address_coords'] = None
-
-    if 'sub' not in st.session_state:
-        st.session_state['sub'] = None
-
-    if 'source' not in st.session_state:
-        st.session_state['source'] = None
-
-    if 'sink' not in st.session_state:
-        st.session_state['sink'] = None
-    if 'uli' not in st.session_state:
-        st.session_state['uli'] = None
+    for var in state_vars:
+        if var not in st.session_state:
+            st.session_state[var] = None
 
     st.subheader("Running Routes")
+
+    #widget inputs
+    with st.sidebar:
+        col1, col2 = st.columns([1,1])
+        with col1:
+            st.radio("Grade Preference", ["Flat","Steep","Rolling"],key="elevation_type")
+            st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
+            st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
+
+        with col2:
+            st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
+            st.subheader("")
+            st.radio("Penalty",["Linear","Exponential"], key="turn_penalty")
+            st.subheader("")
+            st.toggle("Prefer Greenway", value=True,key="greenway_preference")
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
 
@@ -225,38 +332,10 @@ def main():
 
     if st.session_state["sub"] is not None:
         sub = st.session_state["sub"]
-        source = st.session_state["source"]
-        sink = st.session_state["sink"]
         map_location = st.container()
 
-        total_length = 0
-        route = osmnx.shortest_path(sub,source, sink)
-
-        for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-            total_length += edge_data['length']*2.0
-
-        while total_length/1609.34 > 1.001*st.session_state["mileage"]:
-            total_length_old = total_length
-            route_old = route
-            sub_old = sub
-            total_length = 0
-
-            route = osmnx.shortest_path(sub,source, sink)
-            sub = sub.subgraph(route)
-
-            for u,v,  key, edge_data in sub.edges(keys=True, data=True):
-                total_length += edge_data['length']
-
-            if((total_length)/1609.34 < st.session_state["mileage"]):
-                route = route_old
-                total_length = total_length_old
-                sub = sub_old
-                break
-            else:
-                sink = route[-2] #last becomes previous second to last
-
-
-        nodes, edges = osmnx.graph_to_gdfs(sub)
+        route = st.session_state["route"]
+        nodes, edges = osmnx.graph_to_gdfs(sub, nodes=True, node_geometry=True)
 
         #out and back, reverse shortest path nodes list and append
         route_2 = route.copy()
@@ -264,13 +343,13 @@ def main():
         route = route + route_2
         route_nodes = nodes.loc[route]
 
-        route_line = LineString(route_nodes['geometry'].tolist())
+        route_line = LineString([(point.x, point.y, point.elevation) for point in route_nodes.itertuples()])
 
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-            st.write(f'Total Distance Out and Back: {np.round(total_length/1609.34,2)}') #meter to mile conversion
+            st.write(f'Total Distance Out and Back: {np.round(st.session_state["length_running"]/1609.34,2)}') #meter to mile conversion
             with map_location:
                 col1,col2 = st.columns([2,1])
                 with col1:
