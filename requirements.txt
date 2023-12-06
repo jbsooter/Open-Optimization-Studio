@@ -9,7 +9,7 @@ recurring-ical-events
 calendar-view
 matplotlib
 openrouteservice
-osmnx
+osmnx == 1.7
 mapclassify
 numpy
 pandas
