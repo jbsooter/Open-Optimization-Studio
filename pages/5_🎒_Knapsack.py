@@ -6,27 +6,29 @@ import streamlit as st
 from ortools.algorithms.python import knapsack_solver
 
 def solve_instance(knapsack_data, algorithm):
-    solver = knapsack_solver.KnapsackSolver(
-        algorithm,
-        "KnapsackExample",
-    )
-    solver.init(knapsack_data["Value"].astype(int).tolist(), [knapsack_data["Size"].astype(int).tolist()], [st.session_state["Knapsack_Size"]])
+    st.session_state["Knapsack_Solution"] = []
+    for alg in algorithm:
+        solver = knapsack_solver.KnapsackSolver(
+            alg,
+            "KnapsackExample",
+        )
+        solver.init(knapsack_data["Value"].astype(int).tolist(), [knapsack_data["Size"].astype(int).tolist()], [st.session_state["Knapsack_Size"]])
 
-    start_time = time.perf_counter_ns()
-    computed_value = solver.solve()
-    solution_time_ns = time.perf_counter_ns() - start_time
+        start_time = time.perf_counter_ns()
+        computed_value = solver.solve()
+        solution_time_ns = time.perf_counter_ns() - start_time
 
-    packed_items = []
-    packed_weights = []
-    total_weight = 0
+        packed_items = []
+        packed_weights = []
+        total_weight = 0
 
-    for i in range(len(knapsack_data["Name"].tolist())):
-        if solver.best_solution_contains(i):
-            packed_items.append(knapsack_data["Name"].tolist()[i])
-            packed_weights.append(knapsack_data["Size"][i])
-            total_weight += knapsack_data["Size"][i]
+        for i in range(len(knapsack_data["Name"].tolist())):
+            if solver.best_solution_contains(i):
+                packed_items.append(knapsack_data["Name"].tolist()[i])
+                packed_weights.append(knapsack_data["Size"][i])
+                total_weight += knapsack_data["Size"][i]
 
-    st.session_state["Knapsack_Solution"] = [computed_value,total_weight, packed_items, packed_weights, solution_time_ns]
+        st.session_state["Knapsack_Solution"].append([computed_value,total_weight, packed_items, packed_weights, solution_time_ns, alg])
 
 def main():
     st.subheader("Knapsack")
@@ -55,15 +57,25 @@ def main():
             knapsack_solver.SolverType.KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER,
             ]
 
-    algo_selection = st.selectbox(label='Algorithm',options=opts)
+    algo_selection = st.multiselect(label='Algorithm',options=opts)
     st.button(label="Solve",on_click=solve_instance, args=[item_data, algo_selection])
 
     if st.session_state["Knapsack_Solution"] is not None:
-        st.write("Optimal Solution: " + str(st.session_state["Knapsack_Solution"][0]))
-        st.write("Solve Time (ns): " + str(st.session_state["Knapsack_Solution"][4]))
-        st.write("Total Weight in Knapsack: " + str(st.session_state["Knapsack_Solution"][1]))
-        st.write("Packed Items: ")
-        st.write(st.session_state["Knapsack_Solution"][2])
+        data_time = {"Algorithm":[],"Solution Time": [], "Solution": []}
+
+        for x in st.session_state["Knapsack_Solution"]:
+            data_time["Algorithm"].append(x[5])
+            data_time["Solution Time"].append(x[4])
+            data_time["Solution"].append(x[0])
+        st.bar_chart(data=pd.DataFrame(data_time), x="Algorithm", y="Solution Time")
+        st.bar_chart(data=pd.DataFrame(data_time), x="Algorithm", y="Solution")
+        for x in st.session_state["Knapsack_Solution"]:
+            st.write("Optimal Solution: " + str(x[0]))
+            st.write("Algorithm:"+ str(x[5]))
+            st.write("Solve Time (ns): " + str(x[4]))
+            st.write("Total Weight in Knapsack: " + str(x[1]))
+            st.write("Packed Items: ")
+            st.write(x[2])
 
 
 if __name__ == "__main__":
