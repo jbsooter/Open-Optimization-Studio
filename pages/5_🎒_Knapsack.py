@@ -2,6 +2,7 @@ import time
 
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 from ortools.algorithms.python import knapsack_solver
 
@@ -44,11 +45,12 @@ def main():
 
 
     knapsack_data = pd.DataFrame(data)
+
     item_data = st.data_editor(knapsack_data, num_rows='dynamic')
+    with st.sidebar:
+        st.number_input(label="Knapsack Size",min_value= 1, max_value=1000,value=15, step=5, key="Knapsack_Size")
 
-    st.number_input(label="Knapsack Size",min_value= 1, max_value=1000,value=15, step=5, key="Knapsack_Size")
-
-    opts = [
+        opts = [
             knapsack_solver.SolverType.KNAPSACK_BRUTE_FORCE_SOLVER,
             knapsack_solver.SolverType.KNAPSACK_MULTIDIMENSION_BRANCH_AND_BOUND_SOLVER,
             knapsack_solver.SolverType.KNAPSACK_64ITEMS_SOLVER,
@@ -57,25 +59,66 @@ def main():
             knapsack_solver.SolverType.KNAPSACK_MULTIDIMENSION_CBC_MIP_SOLVER,
             ]
 
-    algo_selection = st.multiselect(label='Algorithm',options=opts)
-    st.button(label="Solve",on_click=solve_instance, args=[item_data, algo_selection])
+        #de facto toString() for solver type objects
+        def format_alg(alg):
+            return str(alg).rsplit(".")[1].rsplit("K_")[1]
+        algo_selection = st.multiselect(label='Algorithm',options=opts, format_func = format_alg)
+        st.button(label="Solve",on_click=solve_instance, args=[item_data, algo_selection])
 
     if st.session_state["Knapsack_Solution"] is not None:
         data_time = {"Algorithm":[],"Solution Time": [], "Solution": []}
 
         for x in st.session_state["Knapsack_Solution"]:
-            data_time["Algorithm"].append(x[5])
-            data_time["Solution Time"].append(x[4])
+            data_time["Algorithm"].append(format_alg(x[5]))
+            data_time["Solution Time"].append(x[4]/1000000000.0)
             data_time["Solution"].append(x[0])
-        st.bar_chart(data=pd.DataFrame(data_time), x="Algorithm", y="Solution Time")
-        st.bar_chart(data=pd.DataFrame(data_time), x="Algorithm", y="Solution")
+
+        #time and solution bar chart data
+        df = pd.DataFrame(data_time)
+
+        chart_time = (
+            alt.Chart(df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Algorithm:O", sort="y", axis=alt.Axis(labelAngle=-45, labelLimit=500 )),
+                y=alt.Y(
+                        "Solution Time:Q",
+                        title="Solution Time (ns)"
+                        ),
+            )
+
+            .properties(width=700, height=500)
+        )
+
+        chart_sol = (
+            alt.Chart(df)
+            .mark_bar()
+            .encode(
+                x=alt.X("Algorithm:O", sort="y", axis=alt.Axis(labelAngle=-45, labelLimit=500 )),
+                y=alt.Y(
+                    "Solution:Q",
+                    title="Solution"
+                ),
+            )
+
+            .properties(width=700, height=500)
+        )
+
+        st.altair_chart((chart_time))
+        st.altair_chart(chart_sol)
+
+        columns = ["Algorithm", "Optimal Solution", "Solve Time (ns)", "Total Weight", "Packed Items"]
+        table_data = []
+
+        # Loop through each solution in the Knapsack_Solution state
         for x in st.session_state["Knapsack_Solution"]:
-            st.write("Optimal Solution: " + str(x[0]))
-            st.write("Algorithm:"+ str(x[5]))
-            st.write("Solve Time (ns): " + str(x[4]))
-            st.write("Total Weight in Knapsack: " + str(x[1]))
-            st.write("Packed Items: ")
-            st.write(x[2])
+            row = [format_alg(str(x[5])), x[0], x[4], x[1], x[2]]
+            table_data.append(row)
+
+        df = pd.DataFrame(table_data, columns=columns)
+
+        # Display the DataFrame as a table
+        st.dataframe(df, use_container_width=True)
 
 
 if __name__ == "__main__":
