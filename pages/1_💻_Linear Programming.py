@@ -316,7 +316,7 @@ def two_var_graphical_solution():
                           (-1.0 / slope_contour), width=0.7, length_includes_head=True, color=color_defaults['gradient'])
 
             # contour lines with y intercept at x intercept of constraints
-            for intercept in x_intercepts:
+            for intercept in list(range(0,int(max(x_intercepts)),20)):
                 x = [0, -intercept / slope_contour]
                 y = [x_val * slope_contour + intercept for x_val in x]
                 ax.plot(x, y, dashes=(6, 2), color=color_defaults['contour'])
@@ -490,12 +490,15 @@ def main():
 
 
     if st.session_state['last_solution'] is not None:
-        st.write(st.session_state['solution_message'])
-        st.write(st.session_state['last_solution'])
+        col1, col2 = st.columns([1,2])
+        col1.write(st.session_state['solution_message'])
+        col1.write(st.session_state['last_solution'])
+
+
         if st.session_state['lp_type'] == 'lp':
             if 'sensitivity_analysis' in st.session_state:
-                st.write("The sensitivity of the constraint set is as follows: ")
-                st.write(st.session_state['sensitivity_analysis'])
+                col1.write("The sensitivity of the constraint set is as follows: ")
+                col1.write(st.session_state['sensitivity_analysis'])
 
         #TODO: Support Graphical with LP Format
         if st.session_state['model_mode_lp'] == 'LP':
@@ -510,9 +513,9 @@ def main():
 
         # if a graphical solution generated, display it
         if figure is not None:
-            st.write("Graphical Representation")
-            col1, col2 = st.columns([3, 2])
-            col1.pyplot(figure)
+            col2.write("Graphical Representation")
+
+            col2.pyplot(figure)
 
 
 

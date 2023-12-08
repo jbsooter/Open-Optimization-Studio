@@ -56,9 +56,9 @@ def build_graph(address,map_mode):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=1.4*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                rgs.append(osmnx.graph_from_point(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(1.5*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -71,10 +71,10 @@ def build_graph(address,map_mode):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.5*st.session_state["mileage"]*1609.34/2, dist_type='network',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(1.4*st.session_state["mileage"])*1609.34/2, dist_type='network',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -177,38 +177,53 @@ def build_route():
     with st.spinner("Computing Routes"):
         #test shortest path only
         results = []
-        for i in range(0,config.running_opts["out_back_node_n"]):
-            for u, v, data in st.session_state["running_graph"].edges(data=True):
-                data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
+        for u, v, data in st.session_state["running_graph"].edges(data=True):
+            data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
 
             # set source and sink
-            source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+        source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
 
-            #get node ids that are on the last graph 1-mi of the considered area
-            rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
-            osmnx.simplify_graph(rg_local)
+        #get node ids that are on the last graph 1-mi of the considered area
+        rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
+        osmnx.simplify_graph(rg_local)
 
-            rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
-            osmnx.simplify_graph(rbg_local)
-            result = [i for i in rg_local if i not in rbg_local]
+        rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
+        osmnx.simplify_graph(rbg_local)
+        result = [i for i in rg_local if i not in rbg_local]
+        #guaruntee node uniwqueness
+        result = set(result)
+        result = list(result)
+        #new seed based on time
+        current_time = int(time.time())
+        random.seed(current_time)
+        z = -1
+        z_same = 0
+        z_prev = 0
+        while z < st.session_state["routes_to_generate"]:
+            #guaruntee against infinite loop
+            if z_prev == z:
+                z_same+= 1
+            else:
+                z_same = 0
 
-            #new seed based on time
-            current_time = int(time.time())
-            random.seed(current_time)
+            if z_same >= 100:
+                break
+
             sink_selected = random.choice(result)
-            #sink_selected = result[0]
+            result.remove(sink_selected)
+
             def sp(source_return, sink_selected):
                 return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
 
-            #route = NoneType
+            #in case no route exists
             while True:
                 route = sp(source_return, sink_selected)
                 try:
                     len(route)
                     break
                 except TypeError:
-                    #st.write("hit")
                     sink_selected = random.choice(result)
+                    result.remove(sink_selected)
 
             sub = st.session_state["running_graph"].subgraph(route)
 
@@ -235,15 +250,26 @@ def build_route():
             sub = sub.subgraph(route_cut)
             sink_selected = route_cut[-1]
 
-            results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+            #post-hoc uniqueness
+            subs_added = []
+            for x in results:
+                subs_added.append(x[2])
 
-        #results.sort(key = lambda row: row[3])
-        random.shuffle(results)
-        st.session_state["sub"] = results[0][0]
-        st.session_state["source"] = results[0][1]
-        st.session_state["sink"] = results[0][2]
-        st.session_state["route"] = results[0][5]
-        st.session_state["length_running"] = results[0][4]
+            if sink_selected not in subs_added:
+                z_prev = z
+                z+=1
+                results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+            else:
+                z_prev = z
+
+
+        results.sort(key = lambda row: row[3])
+
+        #ensure uniqueness after cuts
+
+        st.session_state["running_route_results"] = results
+        st.session_state["route_iter"] = 0
+        st.session_state["route_iter_max"] = z + 1
 
 @st.cache_data(ttl=15*60) #refresh 15 min
 def nws_api():
@@ -254,7 +280,6 @@ def nws_api():
 
     URL = response.json()['properties']['forecastHourly']
     response = requests.get(URL)
-
 
     # Limiting to the first 10 periods
     response_json = response.json()
@@ -277,7 +302,7 @@ def nws_api():
         md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
     return md_table
 def main():
-    state_vars = ['running_graph', 'address_coords', 'sub', 'source', 'sink', 'length_running', 'route']
+    state_vars = ['running_graph', 'address_coords', 'sub', 'source', 'sink', 'length_running', 'route', 'running_route_results', 'route_iter']
 
     for var in state_vars:
         if var not in st.session_state:
@@ -289,15 +314,14 @@ def main():
     with st.sidebar:
         col1, col2 = st.columns([1,1])
         with col1:
-            st.radio("Grade Preference", ["Flat","Steep","Rolling"],key="elevation_type")
+            st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
             st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
             st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
+            st.number_input("Number of Routes to Generate", value=config.running_opts["out_back_node_n"], key="routes_to_generate")
 
         with col2:
             st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
-            st.subheader("")
             st.radio("Penalty",["Linear","Exponential"], key="turn_penalty")
-            st.subheader("")
             st.toggle("Prefer Greenway", value=True,key="greenway_preference")
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
@@ -330,11 +354,28 @@ def main():
         #run  model
         st.button("Generate Routes",on_click=build_graph,args=[address, map_mode])
 
-    if st.session_state["sub"] is not None:
-        sub = st.session_state["sub"]
+    if st.session_state["running_route_results"] is not None:
+        def route_plus():
+            if st.session_state["route_iter"] < st.session_state["route_iter_max"] - 1:
+                st.session_state["route_iter"] +=1
+            else:
+                st.toast("This is the last generated route. Press the left arrow to see other routes. ")
+
+        def route_minus():
+            if st.session_state["route_iter"] > 0:
+                st.session_state["route_iter"] -= 1
+            else:
+                st.toast("This is the first generated route. Press the right arrow to see other routes. ")
+
+        #begin map layout
+        cola, colb, colc = st.columns([1,10,1])
+        cola.button(label=":arrow_backward:", on_click=route_minus)
+        colc.button(label=":arrow_forward:", on_click=route_plus)
+
+        sub = st.session_state["running_route_results"][st.session_state["route_iter"]][0]
         map_location = st.container()
 
-        route = st.session_state["route"]
+        route = st.session_state["running_route_results"][st.session_state["route_iter"]][5]
         nodes, edges = osmnx.graph_to_gdfs(sub, nodes=True, node_geometry=True)
 
         #out and back, reverse shortest path nodes list and append
@@ -349,12 +390,12 @@ def main():
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-            st.write(f'Total Distance Out and Back: {np.round(st.session_state["length_running"]/1609.34,2)}') #meter to mile conversion
+            st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
             with map_location:
-                col1,col2 = st.columns([2,1])
-                with col1:
+                #col1,col2 = st.columns([2,1])
+                with colb:
                     streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles=config.running_opts["map_tile"],attr=config.running_opts["map_tile_attr"],style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
-                col2.button(label="Regenerate Route", on_click=build_route)
+
             #GPX Download
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
