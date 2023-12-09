@@ -450,8 +450,6 @@ def add_task():
 
 
 def main():
-    st.set_page_config(layout="wide")
-
     st.subheader("Time Blocking")
 
     with st.sidebar:

@@ -418,8 +418,6 @@ def clear_problem_ss():
     st.session_state['last_solution'] = None
 
 def main():
-    st.set_page_config(layout="wide")
-
     st.subheader("Linear Programming")
 
     # initialize session default data
