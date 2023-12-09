@@ -311,7 +311,7 @@ def main():
     st.number_input("Number of Vehicles", key="num_vehicles", value=1,step=1)
 
     # select vehicle capacity
-    st.number_input("Vehicle Order Capacity", key="vehicle_capacity",value=3,step=1)
+    st.number_input("Vehicle \"Node\" Capacity", key="vehicle_capacity",value=3,step=1)
 
     # select depot
     streamlit_searchbox.st_searchbox(label="Address of Start Location", search_function=pelias_autocomplete,key="VR_Origin")
