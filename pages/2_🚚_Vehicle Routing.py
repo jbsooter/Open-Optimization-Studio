@@ -4,9 +4,10 @@ import pandas as pd
 import streamlit_folium
 import openrouteservice
 import streamlit as st
+import streamlit_searchbox
 from matplotlib import pyplot as plt
 
-from openrouteservice import distance_matrix
+from openrouteservice import distance_matrix, geocode
 from openrouteservice.directions import directions
 from openrouteservice.exceptions import ApiError
 from openrouteservice.geocode import pelias_search
@@ -26,6 +27,10 @@ else:
         key=st.secrets["ors_key"],
         base_url=config.vrp_opts["ors_server"])
 
+@st.cache_data(ttl= 2,show_spinner=False)
+def pelias_autocomplete(searchterm: str) -> list[any]:
+    #https://github.com/pelias/documentation/blob/master/autocomplete.md
+    return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
 
 def query_matrix(nodes):
     '''
@@ -136,8 +141,6 @@ def generic_vrp(addresses, depot_index):
     # Print solution on console.
     if solution:
         # initial
-        st.write(all_solutions.ObjectiveValue(
-            all_solutions.SolutionCount() - 1))
         print_solution(
             addresses,
             nodes,
@@ -288,6 +291,9 @@ def main():
     if 'input_addresses' not in st.session_state:
         st.session_state["input_addresses"] = pd.DataFrame()
 
+    if 'num_dest' not in st.session_state:
+        st.session_state["num_dest"] = 1
+
     # configure traveller profile and cost type
     st.selectbox(
         label="Traveller Profile",
@@ -307,28 +313,30 @@ def main():
     # select vehicle capacity
     st.number_input("Vehicle Order Capacity", key="vehicle_capacity",value=3,step=1)
 
-    # constrain geocoding region (not currently supported
-    # st.text_input("Region",key="geocoding_region")
-    # input addresses
-    st.session_state.addresses_df = pd.DataFrame(
-        {
-            "Address to Visit": [
-                "800 W Dickson St, Fayetteville, Ar 72701",
-                "1270 Nolan Richardson Dr, Fayetteville, AR 72701",
-                "3919 N Mall Ave, Fayetteville, AR 72703"],
-            "depot": [
-                True,
-                False,
-                False]})
-    st.session_state["input_addresses"] = st.data_editor(
-        data=st.session_state["addresses_df"],
-        num_rows="dynamic",
-        key="edited_addresses_df")
+    # select depot
+    streamlit_searchbox.st_searchbox(label="Address of Start Location", search_function=pelias_autocomplete,key="VR_Origin")
+
+    def inc_num():
+        st.session_state["num_dest"] =st.session_state["num_dest"] + 1
+    def dec_num():
+        st.session_state["num_dest"] = st.session_state["num_dest"] - 1
+
+    # ability to add n locations
+    for i in range(0, st.session_state["num_dest"]):
+        streamlit_searchbox.st_searchbox(label=f"Destination {i+1}",search_function=pelias_autocomplete, key=f"VR_Stop_{i}")
+
+    col1,col2,col3 = st.columns([1,1,1])
+    col1.button(label="Add Destination",on_click=inc_num)
+    col2.button(label="Remove Destination",on_click=dec_num)
+
+    aggregate_addresses = [st.session_state["VR_Origin"]["result"]]
+    for i in range(0, st.session_state["num_dest"]):
+        aggregate_addresses.append(st.session_state[f"VR_Stop_{i}"]["result"])
 
     # run address query
-    st.button("Run Optimization", on_click=rate_limited_generic_vrp, args=[
-              (st.session_state["input_addresses"])["Address to Visit"],
-        [i for i in range(len(st.session_state["input_addresses"]["depot"])) if st.session_state["input_addresses"]["depot"][i] != 0][0]]) #find first address marked as depot and report index
+    col3.button("Run Optimization", on_click=rate_limited_generic_vrp, args=[
+              pd.Series(aggregate_addresses),
+        0]) #first entry in aggregate addresses is depot
 
     if 'vrp_solution' in st.session_state:
         for x in st.session_state['vrp_solution']['text']:

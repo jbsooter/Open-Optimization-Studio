@@ -2,19 +2,19 @@ streamlit
 streamlit-ace
 streamlit-searchbox
 streamlit-folium==0.15.0
-folium==0.14.0
+streamlit-js-eval
+
 ortools
-scikit-learn
-recurring-ical-events
-calendar-view
-matplotlib
 openrouteservice
 osmnx == 1.7
-mapclassify
 numpy
 pandas
-scipy
 geopandas
 shapely
 geocoder
-streamlit-js-eval
+scipy
+
+matplotlib == 3.7.2
+folium==0.14.0
+recurring-ical-events
+calendar-view
