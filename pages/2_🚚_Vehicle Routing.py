@@ -280,13 +280,18 @@ def change_route_limit():
     #remove node limit
     config.vrp_opts["max_num_nodes"] = 10000
 def main():
+    st.set_page_config(
+        page_icon="🚚"
+    )
     st.subheader("Vehicle Routing")
 
     with st.sidebar:
         st.text_input(key="personal-ors-key",label="Enter Personal ORS Key Here",
                       help="If you would like to route more than 8 locations, obtain a personal openrouteservice key.  [(sign up)](https://openrouteservice.org/plans/)")
         st.button("Add Key",on_click=change_route_limit)
-        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Vehicle%20Routing)")
+
+        st.link_button(label="Docs", url="https://jbsooter.github.io/Open-Optimization-Studio/Vehicle%20Routing")
+
     # add session state location for addresses
     if 'input_addresses' not in st.session_state:
         st.session_state["input_addresses"] = pd.DataFrame()

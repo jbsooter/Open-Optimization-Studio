@@ -450,10 +450,14 @@ def add_task():
 
 
 def main():
+    st.set_page_config(
+        page_icon="⌚"
+    )
+
     st.subheader("Time Blocking")
 
     with st.sidebar:
-        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Time%20Blocking)")
+        st.link_button(label="Docs",url="https://jbsooter.github.io/Open-Optimization-Studio/Time%20Blocking")
     # upload ics file
     st.file_uploader(
         "Upload Calendar",

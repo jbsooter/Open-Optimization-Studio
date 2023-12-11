@@ -32,6 +32,9 @@ def solve_instance(knapsack_data, algorithm):
         st.session_state["Knapsack_Solution"].append([computed_value,total_weight, packed_items, packed_weights, solution_time_ns, alg])
 
 def main():
+    st.set_page_config(
+        page_icon="🎒"
+    )
     st.subheader("Knapsack")
 
     if "Knapsack_Solution" not in st.session_state:
@@ -42,7 +45,6 @@ def main():
         'Size': [9, 6, 3, 2, 4, 5, 4, 6, 4, 3, 3, 2],
         'Value': [8, 7, 5, 4, 2, 6, 3, 8, 6, 4, 5, 3]
     }
-
 
     knapsack_data = pd.DataFrame(data)
 
@@ -86,7 +88,6 @@ def main():
                         title="Solution Time (ns)"
                         ),
             )
-
             .properties(width=700, height=500)
         )
 
@@ -100,7 +101,6 @@ def main():
                     title="Solution"
                 ),
             )
-
             .properties(width=700, height=500)
         )
 

@@ -302,6 +302,10 @@ def nws_api():
         md_table += f"| {times[i]} | {temperatures[i]} | {humidities[i]} | {wind_speeds[i]} | {short_forecasts[i]} |\n"
     return md_table
 def main():
+    st.set_page_config(
+        page_icon="🏃"
+    )
+
     state_vars = ['running_graph', 'address_coords', 'sub', 'source', 'sink', 'length_running', 'route', 'running_route_results', 'route_iter']
 
     for var in state_vars:

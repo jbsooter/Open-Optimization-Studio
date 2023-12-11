@@ -418,6 +418,9 @@ def clear_problem_ss():
     st.session_state['last_solution'] = None
 
 def main():
+    st.set_page_config(
+        page_icon="💻"
+    )
     st.subheader("Linear Programming")
 
     # initialize session default data
@@ -444,8 +447,8 @@ def main():
 
         st.header("Settings")
         st.number_input("Time Limit (s)", value=60, key="time_limit")
-        st.write("[Docs](https://jbsooter.github.io/Open-Optimization-Studio/Linear%20Programming)")
-        #todo add to others
+
+        st.link_button(label="Docs",url="https://jbsooter.github.io/Open-Optimization-Studio/Linear%20Programming")
 
     #lp mit mode
     if st.session_state['model_mode_lp'] == 'LP':
