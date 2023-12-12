@@ -166,7 +166,10 @@ def cost_function(way,start_node,end_node):
                     elevation_cost -=  100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
                 elif st.session_state["elevation_type"] == "Rolling":
                     elevation_cost += 0
-    cost = (0.25*elevation_cost + 0.25*turn_cost + 0.25*type_cost + 0.25*speed_cost)
+    cost = (st.session_state["grade_weight"]*elevation_cost
+            + st.session_state["turns_weight"]*turn_cost
+            + st.session_state["road_type_weight"]*type_cost
+            + st.session_state["speed_weight"]*speed_cost)
     #No negative costs
     if cost <= 0:
         return 0
@@ -316,17 +319,26 @@ def main():
 
     #widget inputs
     with st.sidebar:
+        st.subheader("Optimization Preferences")
         col1, col2 = st.columns([1,1])
         with col1:
             st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
             st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
             st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
+
+            st.slider("Grade Importance: ", min_value=0, max_value=100, value=25, key="grade_weight")
+            st.slider("Turns Importance: ", min_value=0, max_value=100, value=25, key="turns_weight")
             st.number_input("Number of Routes to Generate", value=config.running_opts["out_back_node_n"], key="routes_to_generate")
 
         with col2:
             st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
             st.radio("Penalty",["Linear","Exponential"], key="turn_penalty")
             st.toggle("Prefer Greenway", value=True,key="greenway_preference")
+
+            for x in range(0,1):
+                st.write(" ")
+            st.slider("Road Type Importance: ", min_value=0, max_value=100, value=25, key="road_type_weight")
+            st.slider("Speed Importance: ", min_value=0, max_value=100, value=25, key="speed_weight")
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
 
