@@ -408,10 +408,12 @@ def main():
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
             with map_location:
-                #col1,col2 = st.columns([2,1])
                 with colb:
-                    streamlit_folium.st_folium(gdf1.explore(tooltip=True,tiles=config.running_opts["map_tile"],attr=config.running_opts["map_tile_attr"],style_kwds={"weight":6}), returned_objects=[],height=700,width=700)
-
+                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15)
+                    folium.GeoJson(gdf1).add_to(m)
+                    folium.Marker(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]],
+                                  tooltip=address).add_to(m)
+                    streamlit_folium.st_folium(m, height=700, width=700)
             #GPX Download
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
