@@ -9,7 +9,7 @@ def main():
 
     st.write(
         """
-          Plan your next road trip (🚚 Vehicle Routing) and what to pack for it (🎒 Knapsack), figure out when to get your work done (⌚ Time Blocking),
+          Plan your next road trip (🚚 Trip Planning) and what to pack for it (🎒 Knapsack), figure out when to get your work done (⌚ Time Blocking),
           mix up your running routine (🏃 Running Routes) or learn more about formulating and solving your own optimizaton problems (💻 Linear Programming).
           
           Use the sidebar to navigate to the various modules. To learn more about how they work and examples of how to use them, check out the [User Guide](https://jbsooter.github.io/Open-Optimization-Studio/). 

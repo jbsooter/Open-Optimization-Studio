@@ -283,7 +283,7 @@ def main():
     st.set_page_config(
         page_icon="🚚"
     )
-    st.subheader("Vehicle Routing")
+    st.subheader("Trip Planning")
 
     with st.sidebar:
         st.text_input(key="personal-ors-key",label="Enter Personal ORS Key Here",

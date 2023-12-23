@@ -69,8 +69,7 @@ scheduling_opts = dict(
 running_opts = dict(
     #http://leaflet-extras.github.io/leaflet-providers/preview/
     map_tile = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    map_tile_attr = 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
-,
+    map_tile_attr = 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
     gpx_file_name = "route.gpx",
     out_back_node_n = 10,
     osmnx_network_filters = ["""["highway" ~ "footway|sidewalk|footpath|path|residential|pedestrian|crossing"]""","""["foot" ~ "designated|yes"]"""]
@@ -79,7 +78,11 @@ running_opts = dict(
 
 # Knapsack Options
 knapsack_opts = dict(
-
+    default_data = {
+    'Name': ['Backpack', 'Clothes (3 outfits)', 'Toiletries (small bag)', 'Travel adapter', 'Water bottle', 'Snacks and other consumables', 'Guidebook', 'Camera', 'Headphones', 'First-aid kit', 'Phone charger & portable battery', 'Miscellaneous (pens, sunglasses, etc.)'],
+    'Size': [9, 6, 3, 2, 4, 5, 4, 6, 4, 3, 3, 2],
+    'Value': [8, 7, 5, 4, 2, 6, 3, 8, 6, 4, 5, 3]
+}
 )
 
 # Time Blocking module options

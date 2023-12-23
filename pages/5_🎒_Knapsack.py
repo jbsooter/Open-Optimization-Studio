@@ -5,6 +5,7 @@ import streamlit as st
 import altair as alt
 
 from ortools.algorithms.python import knapsack_solver
+from utilities import config
 
 def solve_instance(knapsack_data, algorithm):
     st.session_state["Knapsack_Solution"] = []
@@ -40,13 +41,7 @@ def main():
     if "Knapsack_Solution" not in st.session_state:
         st.session_state["Knapsack_Solution"] = None
 
-    data = {
-        'Name': ['Backpack', 'Clothes (3 outfits)', 'Toiletries (small bag)', 'Travel adapter', 'Water bottle', 'Snacks and other consumables', 'Guidebook', 'Camera', 'Headphones', 'First-aid kit', 'Phone charger & portable battery', 'Miscellaneous (pens, sunglasses, etc.)'],
-        'Size': [9, 6, 3, 2, 4, 5, 4, 6, 4, 3, 3, 2],
-        'Value': [8, 7, 5, 4, 2, 6, 3, 8, 6, 4, 5, 3]
-    }
-
-    knapsack_data = pd.DataFrame(data)
+    knapsack_data = pd.DataFrame(config.knapsack_opts["default_data"])
 
     item_data = st.data_editor(knapsack_data, num_rows='dynamic')
     with st.sidebar:
@@ -119,7 +114,6 @@ def main():
 
         # Display the DataFrame as a table
         st.dataframe(df, use_container_width=True)
-
 
 if __name__ == "__main__":
     main()
