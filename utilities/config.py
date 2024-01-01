@@ -23,7 +23,7 @@ two_var_color_defaults = dict(
 )
 
 # Vehicle Routing options
-vrp_opts = dict(
+trip_planning_opts = dict(
     ors_server='Default',  # options [Default,insert/url/here]
     ors_matrix_profile_opts=['driving-car',
                              'foot-walking',

@@ -47,7 +47,7 @@ else:
 @st.cache_data(ttl= 2,show_spinner=False)
 def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
-    return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm,country="USA")["features"]]
+    return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm)["features"]]
 
 def build_graph(address,map_mode):
     with st.spinner(text="Requesting Map Data"):

@@ -18,14 +18,14 @@ from utilities import config
 
 # ORS client to be shared among all methods
 client = None
-if config.vrp_opts["ors_server"] == "Default":
+if config.trip_planning_opts["ors_server"] == "Default":
     client = openrouteservice.Client(key=st.secrets["ors_key"])
-elif config.vrp_opts["ors_server"] == "Default-Personal":
+elif config.trip_planning_opts["ors_server"] == "Default-Personal":
     client = openrouteservice.Client(key=st.session_state["personal-ors-key"])
 else:
     client = openrouteservice.Client(
         key=st.secrets["ors_key"],
-        base_url=config.vrp_opts["ors_server"])
+        base_url=config.trip_planning_opts["ors_server"])
 
 @st.cache_data(ttl= 2,show_spinner=False)
 def pelias_autocomplete(searchterm: str) -> list[any]:
@@ -239,7 +239,7 @@ def print_solution(addresses, nodes, manager, routing, solution):
             coords,
             weight=5,
             opacity=1,
-            color=config.vrp_opts["folium_colors"][vehicle_id]).add_to(m)
+            color=config.trip_planning_opts["folium_colors"][vehicle_id]).add_to(m)
         routes_all.append(route)
     # create optimal zoom
     nodes_all_df = pd.DataFrame(nodes).rename(
@@ -259,9 +259,9 @@ def rate_limited_generic_vrp(addresses, depot_index):
     :param addresses:
     :return:
     '''
-    if len(addresses.index) > config.vrp_opts["max_num_nodes"]:
+    if len(addresses.index) > config.trip_planning_opts["max_num_nodes"]:
         st.write(
-            f"Your problem instance is larger than the maximum configured size of {config.vrp_opts['max_num_nodes']}")
+            f"Your problem instance is larger than the maximum configured size of {config.trip_planning_opts['max_num_nodes']}")
     else:
         generic_vrp(addresses, depot_index)
 
@@ -273,12 +273,12 @@ def change_route_limit():
     '''
     try:
         directions(openrouteservice.Client(key=st.session_state["personal-ors-key"]),coordinates=[])
-        config.vrp_opts["ors_server"] = "Default-Personal"
+        config.trip_planning_opts["ors_server"] = "Default-Personal"
     except ApiError:
         st.error("API Key is invalid. ")
         return
     #remove node limit
-    config.vrp_opts["max_num_nodes"] = 10000
+    config.trip_planning_opts["max_num_nodes"] = 10000
 def main():
     st.set_page_config(
         page_icon="🚚"
@@ -302,12 +302,12 @@ def main():
     # configure traveller profile and cost type
     st.selectbox(
         label="Traveller Profile",
-        options=config.vrp_opts["ors_matrix_profile_opts"],
+        options=config.trip_planning_opts["ors_matrix_profile_opts"],
         key='matrix_profile')
 
     st.selectbox(
         label="Cost Metric",
-        options=config.vrp_opts["cost_metrics"],
+        options=config.trip_planning_opts["cost_metrics"],
         key='cost_metric',
         help='distance is in miles, duration is in seconds'
     )
