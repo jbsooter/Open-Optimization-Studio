@@ -35,14 +35,14 @@ osmnx.settings.bidirectional_network_types = ['all']
 #retrieve client
 # ORS client to be shared among all methods
 client = None
-if config.vrp_opts["ors_server"] == "Default":
+if config.trip_planning_opts["ors_server"] == "Default":
     client = openrouteservice.Client(key=st.secrets["ors_key"])
-elif config.vrp_opts["ors_server"] == "Default-Personal":
+elif config.trip_planning_opts["ors_server"] == "Default-Personal":
     client = openrouteservice.Client(key=st.session_state["personal-ors-key"])
 else:
     client = openrouteservice.Client(
         key=st.secrets["ors_key"],
-        base_url=config.vrp_opts["ors_server"])
+        base_url=config.trip_planning_opts["ors_server"])
 
 @st.cache_data(ttl= 2,show_spinner=False)
 def pelias_autocomplete(searchterm: str) -> list[any]:
