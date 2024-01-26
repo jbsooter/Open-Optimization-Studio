@@ -10,6 +10,7 @@ import streamlit as st
 from calendar_view.calendar import Calendar
 from calendar_view.config.style import image_font
 from calendar_view.core.config import CalendarConfig
+from calendar_view.core.event import Event
 from ortools.linear_solver import pywraplp
 from calendar_view.config import style
 
@@ -200,21 +201,26 @@ def generate_time_blocks(I, K, a_k, p_k, r_i, d_i):
                     ' - ' +
                     end.time().strftime('%I:%M %p %Z'))
 
-        # remove events that are not within the timeframe
-        cal_df = st.session_state["calendar_df"]
+    # remove events that are not within the timeframe
+    cal_df = st.session_state["calendar_df"]
+    cal_df.drop_duplicates(inplace=True)
 
-        # add calendar events to time block png
-        for index, row in cal_df.iterrows():
-            task_calendar.add_event(
+    # add calendar events to time block png
+    events = []
+    for index, row in cal_df.iterrows():
+        events.append(
+            Event(
                 title=row["name"],
                 day=row["begin"].date(),
                 start=row["begin"].time().strftime('%H:%M%Z'),
                 end=row["end"].time().strftime('%H:%M%Z'),
                 style=config.calendar_event_opts['event_display_color'],
                 notes=row["begin"].time().strftime('%I:%M %p %Z') +
-                ' - ' +
-                row["end"].time().strftime('%I:%M %p %Z'))
+                    ' - ' +
+                    row["end"].time().strftime('%I:%M %p %Z'))
+            )
 
+    task_calendar.add_events(events)
     task_calendar.save('images/time_blocks.png')
     st.image('images/time_blocks.png')
 
@@ -299,13 +305,14 @@ def model_builder():
     # forall periods on horizon
     for k in range(0, int(num_periods)):
         # none before working hours
+        #st.write( st.write(st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][0]))
         if period_in_day < utility_functions.working_hour_str_to_num(
-                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][0]) * 4:
+                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][0]) * 4 + 1: #correct "availability offset"
             a_k[k] = 0
 
         # none after working hours
         if period_in_day >= utility_functions.working_hour_str_to_num(
-                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][1]) * 4:
+                st.session_state[f'hours_{utility_functions.day_of_week_int_to_str(current_day)}'][1]) * 4 - 1 - 4: #correct "availability offset"
             a_k[k] = 0
 
         # if day is not a workday then make it unavailable
