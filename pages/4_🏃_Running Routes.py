@@ -113,18 +113,18 @@ def cost_function(way,start_node,end_node):
         elif st.session_state["turn_penalty"] == "Exponential":
             if st.session_state["turn_type"] == "Many Turns":
                 if int(way["length"]) < 500:
-                    turn_cost -= math.pow(10,2)
+                    turn_cost -= math.pow(2,10)
                 elif int(way["length"]) < 1000:
-                    turn_cost -= math.pow(9,2)
+                    turn_cost -= math.pow(2,9)
                 elif int(way["length"]) < 1500:
-                    turn_cost -= math.pow(8,2)
+                    turn_cost -= math.pow(2,8)
             elif st.session_state["turn_type"] == "Few Turns":
                 if int(way["length"]) < 500:
-                    turn_cost += math.pow(10,2)
+                    turn_cost += math.pow(2,10)
                 elif int(way["length"]) < 1000:
-                    turn_cost += math.pow(9,2)
+                    turn_cost += math.pow(2,9)
                 elif int(way["length"]) < 1500:
-                    turn_cost += math.pow(8,2)
+                    turn_cost += math.pow(2,8)
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         try:
@@ -161,9 +161,9 @@ def cost_function(way,start_node,end_node):
                     elevation_cost -= 0
             elif st.session_state["elevation_penalty"] == "Exponential":
                 if st.session_state["elevation_type"] == "Flat":
-                    elevation_cost += 100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
+                    elevation_cost += 100*math.pow(2, np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))
                 elif st.session_state["elevation_type"] == "Steep":
-                    elevation_cost -=  100*math.pow(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]),2)
+                    elevation_cost -=  100*math.pow(2,np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))
                 elif st.session_state["elevation_type"] == "Rolling":
                     elevation_cost += 0
     cost = (st.session_state["grade_weight"]*elevation_cost
@@ -407,6 +407,11 @@ def main():
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
+            #GPX Download
+            file_mem = BytesIO()
+            gdf1.to_file(file_mem,'GPX')
+            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
+
             with map_location:
                 with colb:
                     m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15)
@@ -414,10 +419,6 @@ def main():
                     folium.Marker(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]],
                                   tooltip=address).add_to(m)
                     streamlit_folium.st_folium(m, height=700, width=700)
-            #GPX Download
-            file_mem = BytesIO()
-            gdf1.to_file(file_mem,'GPX')
-            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
 
             with st.expander("Weather Report"):
                 st.markdown(nws_api())
