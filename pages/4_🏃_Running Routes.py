@@ -142,7 +142,7 @@ def cost_function(way,start_node,end_node):
             type_cost += 0
         #prefer cycleways
         if st.session_state["greenway_preference"]:
-            if way["highway"]  in ["cycleway"]:#,"pedestrian","track","footway","path"]:
+            if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
                 type_cost  -= 100
 
             if "foot" in way:
