@@ -80,9 +80,22 @@ def build_graph(address,map_mode):
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
 
     with st.spinner(text="Requesting Elevation Data"):
-        #snippet to add elevation to entire graph.
-        osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
-                                               url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
+        attempts = 0
+        while True:
+            try:
+                attempts = attempts + 1
+                #snippet to add elevation to entire graph.
+                osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
+                                                       url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
+
+                break
+            except:
+                if attempts < 3:
+                    st.error("Elevation Query Failed. Will Re-attempt in 10 seconds")
+                    time.sleep(10) #pause ten seconds and try again
+                else:
+                    st.error("Open-Elevation.com appears to be experiencing downtime. Please try again later. ")
+
     build_route()
 
 def cost_function(way,start_node,end_node):
@@ -158,14 +171,9 @@ def cost_function(way,start_node,end_node):
                     elevation_cost -= 200*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
             elif st.session_state["elevation_penalty"] == "Exponential":
                 if st.session_state["elevation_type"] == "Flat":
-                    elevation_cost += 0.5*math.pow(2, 100*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])))
-
+                    elevation_cost += math.pow(2, min(5.6435,20*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))))
                 elif st.session_state["elevation_type"] == "Steep":
-                    elevation_cost -= 0.5*math.pow(2, 100*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])))
-        if elevation_cost > 100:
-            elevation_cost = 100
-        if elevation_cost < 0:
-            elevation_cost = 0
+                    elevation_cost -= math.pow(2, min(5.6435,20*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))))
 
     cost = (st.session_state["grade_weight"]*elevation_cost
             + st.session_state["turns_weight"]*turn_cost
