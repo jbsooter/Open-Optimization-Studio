@@ -183,6 +183,8 @@ def cost_function(way,start_node,end_node):
     return cost*way["length"] #more costly if lasts longer debating this
 
 def build_route():
+    st.session_state["gpx_file"] = None #clear download button
+
     with st.spinner("Computing Routes"):
         #test shortest path only
         results = []
@@ -288,7 +290,18 @@ def nws_api():
     response = requests.get(URL)
 
     URL = response.json()['properties']['forecastHourly']
-    response = requests.get(URL)
+    attempts = 0
+    while True:
+        try:
+            attempts = attempts + 1
+            response = requests.get(URL)
+            break
+        except:
+            if attempts < 3:
+                st.error("National Weather Service Query Failed. Will Try again in 10 seconds. ")
+                time.sleep(10) #pause ten seconds and try again
+            else:
+                st.error("The National Weather Service API appears to be experiencing downtime. Please try again later. ")
 
     # Limiting to the first 10 periods
     response_json = response.json()
@@ -412,11 +425,13 @@ def main():
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-            st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
-            #GPX Download
+           # st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
+            ##GPX Download
+
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
-            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
+
+            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem, key="gpx_file")
 
             with map_location:
                 with colb:
