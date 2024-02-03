@@ -49,16 +49,22 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm)["features"]]
 
-def build_graph(address,map_mode):
+def build_cache_support(address, map_mode):
+    #run build graph, if same, no queries, otherwise, queries update graph session state
+    build_graph(address, map_mode, st.session_state["mileage"])
+    #build route based on opt criteria
+    build_route()
+@st.cache_data()
+def build_graph(address,map_mode, mileage):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
             rgs = []
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -71,10 +77,10 @@ def build_graph(address,map_mode):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -94,7 +100,8 @@ def build_graph(address,map_mode):
                     st.error("Elevation Query Failed. Will Re-attempt in 10 seconds")
                     time.sleep(10) #pause ten seconds and try again
                 else:
-                    st.error("Open-Elevation.com appears to be experiencing downtime. Please try again later. ")
+                    st.error("open-elevation.com appears to be experiencing downtime. Please try again later. ")
+                    return
 
     build_route()
 
@@ -220,8 +227,13 @@ def build_route():
             if z_same >= 100:
                 break
 
-            sink_selected = random.choice(result)
-            result.remove(sink_selected)
+            try:
+                sink_selected = random.choice(result)
+                result.remove(sink_selected)
+            except IndexError:
+                st.spinner("Error: No Feasible Route was found of the given distance")
+                st.session_state["running_route_results"] = None
+                return
 
             def sp(source_return, sink_selected):
                 return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
@@ -387,7 +399,7 @@ def main():
         #test folium entry
         st.number_input("Desired Mileage", value=3, key="mileage")
         #run  model
-        st.button("Generate Routes",on_click=build_graph,args=[address, map_mode])
+        st.button("Generate Routes",on_click=build_cache_support,args=[address, map_mode])
 
     if st.session_state["running_route_results"] is not None:
         def route_plus():
@@ -425,7 +437,7 @@ def main():
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-           # st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
+            st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
             ##GPX Download
 
             file_mem = BytesIO()
@@ -435,7 +447,7 @@ def main():
 
             with map_location:
                 with colb:
-                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15)
+                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15, tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
                     folium.GeoJson(gdf1).add_to(m)
                     folium.Marker(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]],
                                   tooltip=address).add_to(m)
