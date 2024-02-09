@@ -224,7 +224,7 @@ def build_route():
             else:
                 z_same = 0
 
-            if z_same >= 1000:
+            if z_same >= config.running_opts["max_iterations"]:
                 break
 
             try:
@@ -282,18 +282,15 @@ def build_route():
                 z_prev = z
                 z+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
-            elif((sink_selected not in subs_added) &((total_cost < results[0][3]*1.05))):
+            elif((sink_selected not in subs_added) &((total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"])))):
                 z_prev = z
                 z+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
             else:
                 z_prev = z
 
-
+        #output
         results.sort(key = lambda row: row[3])
-
-        #ensure uniqueness after cuts
-
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
         st.session_state["route_iter_max"] = z + 1
