@@ -224,7 +224,7 @@ def build_route():
             else:
                 z_same = 0
 
-            if z_same >= 100:
+            if z_same >= 1000:
                 break
 
             try:
@@ -278,10 +278,14 @@ def build_route():
             for x in results:
                 subs_added.append(x[2])
 
-            if sink_selected not in subs_added:
+            if (sink_selected not in subs_added) &  (len(results) == 0):
                 z_prev = z
                 z+=1
-                results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
+            elif((sink_selected not in subs_added) &((total_cost < results[0][3]*1.05))):
+                z_prev = z
+                z+=1
+                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
             else:
                 z_prev = z
 
