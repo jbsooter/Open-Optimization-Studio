@@ -49,16 +49,22 @@ def pelias_autocomplete(searchterm: str) -> list[any]:
     #https://github.com/pelias/documentation/blob/master/autocomplete.md
     return [name["properties"]["label"] for name in geocode.pelias_autocomplete(client=client, text=searchterm)["features"]]
 
-def build_graph(address,map_mode):
+def build_cache_support(address, map_mode):
+    #run build graph, if same, no queries, otherwise, queries update graph session state
+    build_graph(address, map_mode, st.session_state["mileage"])
+    #build route based on opt criteria
+    build_route()
+@st.cache_data()
+def build_graph(address,map_mode, mileage):
     with st.spinner(text="Requesting Map Data"):
         if map_mode == True:
             rgs = []
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -71,10 +77,10 @@ def build_graph(address,map_mode):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*st.session_state["mileage"]*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*st.session_state["mileage"])*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -94,7 +100,8 @@ def build_graph(address,map_mode):
                     st.error("Elevation Query Failed. Will Re-attempt in 10 seconds")
                     time.sleep(10) #pause ten seconds and try again
                 else:
-                    st.error("Open-Elevation.com appears to be experiencing downtime. Please try again later. ")
+                    st.error("open-elevation.com appears to be experiencing downtime. Please try again later. ")
+                    return
 
     build_route()
 
@@ -183,6 +190,8 @@ def cost_function(way,start_node,end_node):
     return cost*way["length"] #more costly if lasts longer debating this
 
 def build_route():
+    st.session_state["gpx_file"] = None #clear download button
+
     with st.spinner("Computing Routes"):
         #test shortest path only
         results = []
@@ -215,11 +224,16 @@ def build_route():
             else:
                 z_same = 0
 
-            if z_same >= 100:
+            if z_same >= config.running_opts["max_iterations"]:
                 break
 
-            sink_selected = random.choice(result)
-            result.remove(sink_selected)
+            try:
+                sink_selected = random.choice(result)
+                result.remove(sink_selected)
+            except IndexError:
+                st.spinner("Error: No Feasible Route was found of the given distance")
+                st.session_state["running_route_results"] = None
+                return
 
             def sp(source_return, sink_selected):
                 return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
@@ -264,18 +278,19 @@ def build_route():
             for x in results:
                 subs_added.append(x[2])
 
-            if sink_selected not in subs_added:
+            if (sink_selected not in subs_added) &  (len(results) == 0):
                 z_prev = z
                 z+=1
-                results.append([sub,source_return,sink_selected,total_cost, total_length, route_cut])
+                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
+            elif((sink_selected not in subs_added) &((total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"])))):
+                z_prev = z
+                z+=1
+                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
             else:
                 z_prev = z
 
-
+        #output
         results.sort(key = lambda row: row[3])
-
-        #ensure uniqueness after cuts
-
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
         st.session_state["route_iter_max"] = z + 1
@@ -288,7 +303,18 @@ def nws_api():
     response = requests.get(URL)
 
     URL = response.json()['properties']['forecastHourly']
-    response = requests.get(URL)
+    attempts = 0
+    while True:
+        try:
+            attempts = attempts + 1
+            response = requests.get(URL)
+            break
+        except:
+            if attempts < 3:
+                st.error("National Weather Service Query Failed. Will Try again in 10 seconds. ")
+                time.sleep(10) #pause ten seconds and try again
+            else:
+                st.error("The National Weather Service API appears to be experiencing downtime. Please try again later. ")
 
     # Limiting to the first 10 periods
     response_json = response.json()
@@ -374,7 +400,7 @@ def main():
         #test folium entry
         st.number_input("Desired Mileage", value=3, key="mileage")
         #run  model
-        st.button("Generate Routes",on_click=build_graph,args=[address, map_mode])
+        st.button("Generate Routes",on_click=build_cache_support,args=[address, map_mode])
 
     if st.session_state["running_route_results"] is not None:
         def route_plus():
@@ -413,14 +439,16 @@ def main():
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
-            #GPX Download
+            ##GPX Download
+
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
-            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem)
+
+            st.download_button(label='Download GPX',file_name=config.running_opts["gpx_file_name"],mime="application/gpx+xml",data=file_mem, key="gpx_file")
 
             with map_location:
                 with colb:
-                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15)
+                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15, tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
                     folium.GeoJson(gdf1).add_to(m)
                     folium.Marker(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]],
                                   tooltip=address).add_to(m)
