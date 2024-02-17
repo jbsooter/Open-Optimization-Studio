@@ -14,16 +14,15 @@ st.set_page_config(layout='wide')
 instance_a = {
     "Little Rock, Arkansas": (34.7465, -92.2896),
     "Fayetteville, Arkansas": (36.0626, -94.1574),
-    "Fort Smith, Arkansas": (35.3872, -94.4244)
-    #"Jonesboro, Arkansas": (35.8423, -90.7043),
-    #"Springfield, Missouri": (37.2083, -93.2923),
-    #"Kansas City, Missouri": (39.0997, -94.5786),
-    #"St. Louis, Missouri": (38.6270, -90.1994),
-    #"Tulsa, Oklahoma": (36.1540, -95.9928),
-    #"Oklahoma City, Oklahoma": (35.4676, -97.5164),
-    #"Wichita, Kansas": (37.6872, -97.3301),
-    #"Topeka, Kansas": (39.0473, -95.6752)
-    #"Overland Park, Kansas": (38.9822, -94.6708)
+    "Fort Smith, Arkansas": (35.3872, -94.4244),
+    "Jonesboro, Arkansas": (35.8423, -90.7043),
+    "Springfield, Missouri": (37.2083, -93.2923),
+    "Kansas City, Missouri": (39.0997, -94.5786),
+    "St. Louis, Missouri": (38.6270, -90.1994),
+    "Tulsa, Oklahoma": (36.1540, -95.9928),
+    "Oklahoma City, Oklahoma": (35.4676, -97.5164),
+    "Wichita, Kansas": (37.6872, -97.3301),
+    "Topeka, Kansas": (39.0473, -95.6752)
 }
 
 
@@ -32,14 +31,14 @@ def validate_tsp_solution(polylines, cities):
     path = []
     for city in cities.values():
         incCount = 0
-        st.write(polylines[0]["coordinates"])
-        for ltlng in polylines[0]["coordinates"]:
-            if math.isclose(ltlng[1], city[0], abs_tol=1)&math.isclose(ltlng[0], city[1], abs_tol=1):
+
+        for ltlng in polylines[0]["coordinates"][:-1]:
+
+            if math.isclose(ltlng[0], city[1], abs_tol=0.05)&math.isclose(ltlng[1], city[0], abs_tol=0.05):
                 incCount += 1
         if incCount == 1:
             path.append(city)
-        st.write(city)
-        st.write(incCount)
+
 
 
     if len(path) == len(cities):
@@ -64,12 +63,13 @@ def main():
         if len(output["all_drawings"]) != 0:
             polylines_only = []
             for x in output["all_drawings"]:
+                #st.write(output["all_drawings"])
                 if x["geometry"]["type"] == "LineString":
                     a = x["geometry"]["coordinates"][0]
-                    a.reverse()
+                    #a.reverse()
                     b = x["geometry"]["coordinates"][1]
-                    b.reverse()
-                    total_distance += geodesic(a,b).miles
+                    #b.reverse()
+                    total_distance += geodesic((a[1],a[0]),(b[1],b[0])).miles
                     polylines_only.append(x["geometry"])
 
             st.write("Total Distance (mi):   " + str(round(total_distance,3)))
