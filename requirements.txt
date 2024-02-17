@@ -18,3 +18,5 @@ folium==0.14.0
 recurring-ical-events
 calendar-view
 mapclassify
+geopy
+gspread
