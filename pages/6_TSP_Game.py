@@ -62,15 +62,17 @@ def main():
     if output["all_drawings"] is not None:
         if len(output["all_drawings"]) != 0:
             polylines_only = []
-            for x in output["all_drawings"]:
-                #st.write(output["all_drawings"])
-                if x["geometry"]["type"] == "LineString":
-                    a = x["geometry"]["coordinates"][0]
+            st.write()
+            for i in range(0, len(output["all_drawings"][0]["geometry"]["coordinates"])-1):
+
+                    a = output["all_drawings"][0]["geometry"]["coordinates"][i]
+
                     #a.reverse()
-                    b = x["geometry"]["coordinates"][1]
+                    b = output["all_drawings"][0]["geometry"]["coordinates"][i+1]
                     #b.reverse()
                     total_distance += geodesic((a[1],a[0]),(b[1],b[0])).miles
-                    polylines_only.append(x["geometry"])
+                    st.write(geodesic((a[1],a[0]),(b[1],b[0])).miles)
+            polylines_only.append(output["all_drawings"][0]["geometry"])
 
             st.write("Total Distance (mi):   " + str(round(total_distance,3)))
 
