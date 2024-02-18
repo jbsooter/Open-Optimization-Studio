@@ -41,14 +41,28 @@ def main():
     with st.sidebar:
         name = st.text_input("Team Name", key="team_name_tsp")
         st.radio(label="Instance",key ="tsp_instance", options=["Arkansas","South_Central","Airports"], on_change=read_scores)
+        if "leaderboard" not in st.session_state:
+            st.session_state["leaderboard"] = None
+        read_scores()
         st.subheader("Leaderboard")
         st.dataframe(st.session_state["leaderboard"])
 
-    if "leaderboard" not in st.session_state:
-        st.session_state["leaderboard"] = None
-        read_scores()
 
-    m = folium.Map(location=[36.082157, -94.171852], zoom_start=5) #fayetteville
+
+    #find centroid
+    total_lat = 0
+    total_lon = 0
+    num_locations = len(utilities.config.tsp_game_opts[st.session_state["tsp_instance"]])
+
+    for city, (lat, lon) in utilities.config.tsp_game_opts[st.session_state["tsp_instance"]].items():
+        total_lat += lat
+        total_lon += lon
+
+    average_lat = total_lat / num_locations
+    average_lon = total_lon / num_locations
+
+
+    m = folium.Map(location=[average_lat,average_lon], zoom_start=5) #centroid
     for city, coord in utilities.config.tsp_game_opts[st.session_state["tsp_instance"]].items():
         folium.Circle(location=coord, popup=city, radius=5000).add_to(m)
         #folium.Marker(location=coord,popup=city).add_to(m)
