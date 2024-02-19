@@ -37,13 +37,29 @@ def validate_tsp_solution(polylines, cities):
         return [False, "Infeasible Solution. Must Visit All Cities Once and Only Once. Missing cities:   " + str(missing)]
 
 def main():
+    st.subheader("Travelling Salesman Game")
+    st.markdown("Given a list of cities and the distances between each pair of cities, what is the shortest possible route that visits each city exactly once and returns to the origin city?")
+
+    with st.expander("Instructions"):
+        st.markdown("**To build a solution**: First, enter your team name on the sidebar. This is required to submit a solution. Use the polyline button to connect the cities shown on the map below. Cities must be connected using a single polyline object. "
+                    "An existing polyline can be disposed of using the trash button, or its nodes rearranged using the edit button. After a polyline has been constructed,"
+                    " below the graph you will recieve the total distance, whether or not your solution is feasible, and the ability to submit it to the leaderboard. ")
+        colL, colR, colB = st.columns([0.25,1,8])
+        colL.image('images/tsp_polyline.png')
+        colR.write("polyline button")
+        colL.image('images/tsp_edit.png')
+        colR.write("edit button")
+        colL.image('images/tsp_trash.png')
+        colR.write("trash button")
+
+
 
     with st.sidebar:
         name = st.text_input("Team Name", key="team_name_tsp")
         st.radio(label="Instance",key ="tsp_instance", options=["Arkansas","South_Central","Airports"], on_change=read_scores)
         if "leaderboard" not in st.session_state:
             st.session_state["leaderboard"] = None
-        read_scores()
+            read_scores()
         st.subheader("Leaderboard")
         st.dataframe(st.session_state["leaderboard"])
 
@@ -62,13 +78,13 @@ def main():
     average_lon = total_lon / num_locations
 
 
-    m = folium.Map(location=[average_lat,average_lon], zoom_start=5) #centroid
+    m = folium.Map(location=[average_lat,average_lon], zoom_start=6) #centroid
     for city, coord in utilities.config.tsp_game_opts[st.session_state["tsp_instance"]].items():
         folium.Circle(location=coord, popup=city, radius=5000).add_to(m)
         #folium.Marker(location=coord,popup=city).add_to(m)
     Draw(export=True).add_to(m)
 
-    output = st_folium(m, width=1300, height=1000)
+    output = st_folium(m,  height = 800,use_container_width=True)
 
     heur_result = solve_heuristic(st.session_state["tsp_instance"])
     total_distance = 0
