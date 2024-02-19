@@ -132,6 +132,6 @@ dmypy.json
 .idea/
 .streamlit/secrets.toml
 
-images/
+/images/time_blocks.png
 
 cache/
