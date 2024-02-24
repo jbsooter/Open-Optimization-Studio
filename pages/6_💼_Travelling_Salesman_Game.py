@@ -56,7 +56,7 @@ def main():
 
     with st.sidebar:
         name = st.text_input("Team Name", key="team_name_tsp")
-        st.radio(label="Instance",key ="tsp_instance", options=["Arkansas","South_Central","Airports"], on_change=read_scores)
+        st.radio(label="Instance",key ="tsp_instance", options=utilities.config.tsp_game_opts.keys(), on_change=read_scores)
         if "leaderboard" not in st.session_state:
             st.session_state["leaderboard"] = None
             read_scores()
@@ -135,8 +135,12 @@ def read_scores():
 
     leaders = pd.DataFrame(scoreboard.get_all_records())
     leaders = leaders.drop(leaders[(leaders == 0).any(axis=1)].index)
-    leaders = leaders[leaders["Instance"] == st.session_state["tsp_instance"]]
-    st.session_state["leaderboard"]= leaders
+    try:
+        leaders = leaders[leaders["Instance"] == st.session_state["tsp_instance"]]
+        st.session_state["leaderboard"]= leaders
+    except:
+        #prevent error from empty leaderboard for instance
+        st.session_state["leaderboard"]= leaders
 
 @st.cache_data
 def solve_heuristic(tsp_instance):
