@@ -1,8 +1,5 @@
 streamlit
-streamlit-ace
-streamlit-searchbox
 streamlit-folium==0.15.0
-streamlit-js-eval
 ortools
 openrouteservice
 osmnx == 1.7
@@ -12,11 +9,8 @@ geopandas
 shapely
 geocoder
 scipy
-scikit-learn
 matplotlib == 3.7.2
 folium==0.14.0
-recurring-ical-events
-calendar-view
 mapclassify
 geopy
 gspread
