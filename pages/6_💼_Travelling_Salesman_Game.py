@@ -65,20 +65,17 @@ def main():
 
 
 
-    #find centroid
-    total_lat = 0
-    total_lon = 0
-    num_locations = len(utilities.config.tsp_game_opts[st.session_state["tsp_instance"]])
+        #find bounding box
+    lats = []
+    lons = []
 
     for city, (lat, lon) in utilities.config.tsp_game_opts[st.session_state["tsp_instance"]].items():
-        total_lat += lat
-        total_lon += lon
+        lats.append(lat)
+        lons.append(lon)
 
-    average_lat = total_lat / num_locations
-    average_lon = total_lon / num_locations
+    m = folium.Map()
+    m.fit_bounds([(min(lats),min(lons)),(max(lats),max(lons))])
 
-
-    m = folium.Map(location=[average_lat,average_lon], zoom_start=6) #centroid
     for city, coord in utilities.config.tsp_game_opts[st.session_state["tsp_instance"]].items():
         folium.Circle(location=coord, popup=city, radius=5000).add_to(m)
         #folium.Marker(location=coord,popup=city).add_to(m)
