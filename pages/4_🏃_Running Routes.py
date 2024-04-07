@@ -288,12 +288,7 @@ def build_route():
             sub = sub.subgraph(route_cut)
             sink_selected = route_cut[-1]
 
-            #post-hoc uniqueness
-            subs_added = []
-            for x in results:
-                subs_added.append(x[2])
-
-            if (sink_selected not in subs_added) &  (len(results) == 0):
+            if  len(results) == 0:
                 routes_generated_prior_iter = routes_generated
                 routes_generated+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
@@ -307,8 +302,7 @@ def build_route():
                         break
 
                 if tabu == False:
-                    #if (sink_selected not in subs_added) &((total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"]))):
-                    if 1==1:
+                    if(total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"])):
                         routes_generated_prior_iter = routes_generated
                         routes_generated+=1
                         results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
