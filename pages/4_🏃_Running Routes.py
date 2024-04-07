@@ -256,10 +256,10 @@ def build_route():
                     route = nx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost", method='dijkstra')
                     #nx shortest path is about a 10x improvement over osmnx
 
-                    len(route)
+                    #len(route)
                     break
                 except:
-                    print(route)
+                    #print(route)
                     sink_selected = random.choice(result)
                     result.remove(sink_selected)
 
@@ -313,7 +313,7 @@ def build_route():
                     routes_generated_prior_iter = routes_generated
             if len(tabu_list) > 100:
                 del tabu_list[-1]
-            print((time.time_ns() - start)/1000000000)
+            #print((time.time_ns() - start)/1000000000)
         #output
         results.sort(key = lambda row: row[3])
         st.session_state["running_route_results"] = results
@@ -463,7 +463,8 @@ def main():
 
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
-            st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)}') #meter to mile conversion
+            st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
+            st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
             ##GPX Download
 
             file_mem = BytesIO()
