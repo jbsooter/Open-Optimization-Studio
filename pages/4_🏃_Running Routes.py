@@ -54,6 +54,15 @@ def build_cache_support(address, map_mode):
     build_graph(address, map_mode, st.session_state["mileage"])
     #build route based on opt criteria
     build_route()
+
+def route_similarity(routeA,routeB):
+    sim_pct = 0
+    for node in routeA:
+        if node in routeB:
+            sim_pct += 1
+
+    return sim_pct/min(len(routeA),len(routeB))
+
 @st.cache_data()
 def build_graph(address,map_mode, mileage):
     with st.spinner(text="Requesting Map Data"):
@@ -198,7 +207,7 @@ def build_route():
         for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
 
-            # set source and sink
+        # set source and sink
         source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
 
         #get node ids that are on the last graph 1-mi of the considered area
@@ -211,20 +220,24 @@ def build_route():
         #guaruntee node uniwqueness
         result = set(result)
         result = list(result)
+
+        #tabu mechanism
+        tabu_list = []
         #new seed based on time
         current_time = int(time.time())
         random.seed(current_time)
-        z = -1
-        z_same = 0
-        z_prev = 0
-        while z < st.session_state["routes_to_generate"]:
+        routes_generated = -1
+        num_iter_routes_generated_unchanged = 0
+        routes_generated_prior_iter = 0
+        while routes_generated < st.session_state["routes_to_generate"]:
+            start = time.time_ns()
             #guaruntee against infinite loop
-            if z_prev == z:
-                z_same+= 1
+            if routes_generated_prior_iter == routes_generated:
+                num_iter_routes_generated_unchanged+= 1
             else:
-                z_same = 0
+                num_iter_routes_generated_unchanged = 0
 
-            if z_same >= config.running_opts["max_iterations"]:
+            if num_iter_routes_generated_unchanged >= config.running_opts["max_iterations"]:
                 break
 
             try:
@@ -235,16 +248,18 @@ def build_route():
                 st.session_state["running_route_results"] = None
                 return
 
-            def sp(source_return, sink_selected):
-                return  osmnx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost")
+
 
             #in case no route exists
             while True:
-                route = sp(source_return, sink_selected)
                 try:
+                    route = nx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost", method='dijkstra')
+                    #nx shortest path is about a 10x improvement over osmnx
+
                     len(route)
                     break
-                except TypeError:
+                except:
+                    print(route)
                     sink_selected = random.choice(result)
                     result.remove(sink_selected)
 
@@ -279,21 +294,37 @@ def build_route():
                 subs_added.append(x[2])
 
             if (sink_selected not in subs_added) &  (len(results) == 0):
-                z_prev = z
-                z+=1
+                routes_generated_prior_iter = routes_generated
+                routes_generated+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
-            elif((sink_selected not in subs_added) &((total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"])))):
-                z_prev = z
-                z+=1
-                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
+                tabu_list.append(route_cut)
             else:
-                z_prev = z
+                tabu = False
 
+                for x in tabu_list:
+                    if route_similarity(x,route_cut) > config.running_opts["tabu_similarity_pct"]:
+                        tabu=True
+                        break
+
+                if tabu == False:
+                    #if (sink_selected not in subs_added) &((total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"]))):
+                    if 1==1:
+                        routes_generated_prior_iter = routes_generated
+                        routes_generated+=1
+                        results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
+                        tabu_list.insert(0,route_cut)
+                    else:
+                        routes_generated_prior_iter = routes_generated
+                else:
+                    routes_generated_prior_iter = routes_generated
+            if len(tabu_list) > 100:
+                del tabu_list[-1]
+            print((time.time_ns() - start)/1000000000)
         #output
         results.sort(key = lambda row: row[3])
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
-        st.session_state["route_iter_max"] = z + 1
+        st.session_state["route_iter_max"] = routes_generated + 1
 
 @st.cache_data(ttl=15*60) #refresh 15 min
 def nws_api():

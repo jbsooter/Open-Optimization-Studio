@@ -74,7 +74,8 @@ running_opts = dict(
     out_back_node_n = 10,
     osmnx_network_filters = ["""["highway" ~ "footway|sidewalk|footpath|path|residential|pedestrian|crossing|service|cycleway|track"]""","""["foot" ~ "designated|yes"]"""],
     max_iterations = 100,
-    acceptable_variance_from_best = 0.10
+    acceptable_variance_from_best = 0.07,
+    tabu_similarity_pct=0.7
 
 )
 
