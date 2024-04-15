@@ -262,7 +262,6 @@ def build_route():
             sink_selected = route_cut[-1]
 
             if  len(results) == 0:
-                routes_generated_prior_iter = routes_generated
                 routes_generated+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
                 tabu_list.append(route_cut)
