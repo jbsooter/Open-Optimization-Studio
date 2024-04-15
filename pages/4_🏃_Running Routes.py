@@ -214,19 +214,10 @@ def build_route():
         current_time = int(time.time())
         random.seed(current_time)
         routes_generated = -1
-        num_iter_routes_generated_unchanged = 0
-        routes_generated_prior_iter = 0
-        while routes_generated < st.session_state["routes_to_generate"]:
-            start = time.time_ns()
-            #guaruntee against infinite loop
-            if routes_generated_prior_iter == routes_generated:
-                num_iter_routes_generated_unchanged+= 1
-            else:
-                num_iter_routes_generated_unchanged = 0
 
-            if num_iter_routes_generated_unchanged >= config.running_opts["max_iterations"]:
-                break
-
+        iter_count = 0
+        bestSeen = 100000000000000000000000
+        while iter_count < config.running_opts["max_iterations"]:
             try:
                 sink_selected = random.choice(result)
                 result.remove(sink_selected)
@@ -235,15 +226,11 @@ def build_route():
                 st.session_state["running_route_results"] = None
                 return
 
-
-
             #in case no route exists
             while True:
                 try:
                     route = nx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost", method='dijkstra')
                     #nx shortest path is about a 10x improvement over osmnx
-
-                    #len(route)
                     break
                 except:
                     #print(route)
@@ -268,7 +255,6 @@ def build_route():
                         total_cost += st.session_state["running_graph"][u][v][0]["cost"]
 
                 else:
-                    #route_cut.append(route[i-1])
                     total_length -= st.session_state["running_graph"][route[i-2]][route[i-1]][0]["length"]*2
                     break
 
@@ -280,6 +266,8 @@ def build_route():
                 routes_generated+=1
                 results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
                 tabu_list.append(route_cut)
+                if total_cost < bestSeen:
+                    bestSeen = total_cost
             else:
                 tabu = False
 
@@ -289,20 +277,22 @@ def build_route():
                         break
 
                 if tabu == False:
-                    if(total_cost < results[0][3]*(1 + config.running_opts["acceptable_variance_from_best"])):
-                        routes_generated_prior_iter = routes_generated
+                    if(total_cost < bestSeen*(1 + config.running_opts["acceptable_variance_from_best"])):
                         routes_generated+=1
                         results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
                         tabu_list.insert(0,route_cut)
-                    else:
-                        routes_generated_prior_iter = routes_generated
-                else:
-                    routes_generated_prior_iter = routes_generated
-            if len(tabu_list) > 100:
+                        if total_cost < bestSeen:
+                            bestSeen = total_cost
+
+
+            if len(tabu_list) > config.running_opts["tabu_list_length"]:
                 del tabu_list[-1]
-            #print((time.time_ns() - start)/1000000000)
+
+            iter_count+=1
+
         #output
         results.sort(key = lambda row: row[3])
+        results = results[0:config.running_opts["out_back_node_n"]]
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
         st.session_state["route_iter_max"] = routes_generated + 1
