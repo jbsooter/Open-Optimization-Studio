@@ -116,62 +116,44 @@ def build_graph(address,map_mode, mileage):
 
 def cost_function(way,start_node,end_node):
     #all 100 to make easier to track weights
-    turn_cost = 50
-    speed_cost = 50
-    elevation_cost = 50
-    type_cost = 50
+    turn_cost = 0
+    speed_cost = 0
+    elevation_cost = 0
+    type_cost = 0
     #https://taginfo.openstreetmap.org/keys
 
     #if length is less than 500 metres, penalize to reduce tons of turns
     if "length" in way:
         if st.session_state["turn_penalty"] =="Linear":
             if st.session_state["turn_type"] == "Many Turns":
-                if int(way["length"]) < 500:
-                    turn_cost -= 50
-                elif int(way["length"]) < 1000:
-                    turn_cost -= 25
-                elif int(way["length"]) < 1500:
-                    turn_cost -= 10
+                turn_cost = min(100.0,int(way["length"])/1000.0)
             elif st.session_state["turn_type"] == "Few Turns":
-                if int(way["length"]) < 500:
-                    turn_cost += 50
-                elif int(way["length"]) < 1000:
-                    turn_cost += 25
-                elif int(way["length"]) < 1500:
-                    turn_cost += 10
+                turn_cost = 100 - min(100.0,int(way["length"])/1000.0)
         elif st.session_state["turn_penalty"] == "Exponential":
             if st.session_state["turn_type"] == "Many Turns":
-                if int(way["length"]) < 500:
-                    turn_cost -= math.pow(2,5.6435)
-                elif int(way["length"]) < 1000:
-                    turn_cost -= math.pow(2,4.6435)
-                elif int(way["length"]) < 1500:
-                    turn_cost -= math.pow(2,5.6435)
+                turn_cost = math.pow(2,((min(100.0,int(way["length"])/1000.0))/100.0)*6.6439)
             elif st.session_state["turn_type"] == "Few Turns":
-                turn_cost = 0
-                if int(way["length"]) < 500:
-                    turn_cost += math.pow(2,5.6435)
-                elif int(way["length"]) < 1000:
-                    turn_cost += math.pow(2,4.6435)
-                elif int(way["length"]) < 1500:
-                    turn_cost += math.pow(2,3.6435)
+                turn_cost = math.pow(2,((100 - min(100.0,int(way["length"])/1000.0))/100.0)*6.6439)
+
     #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
     if "maxspeed" in way:
         try:
             if int(way["maxspeed"][:2]) <= st.session_state["speed_restriction"]:
-                speed_cost -= 50
+                speed_cost = 0
+            else:
+                speed_cost = 100
         except TypeError:
             int()
     #avoid raods
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
-            type_cost += 50
+            type_cost = 100
         elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
-            type_cost -= 25
+            type_cost = 50
         #prefer cycleways
         if st.session_state["greenway_preference"]:
             if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
-                type_cost  -= 50
+                type_cost  = 0
 
             if "foot" in way:
                 if way["foot"] in ["designated","yes"]:
@@ -182,14 +164,16 @@ def cost_function(way,start_node,end_node):
         if "elevation" in end_node:
             if st.session_state["elevation_penalty"] == "Linear":
                 if st.session_state["elevation_type"] == "Flat":
-                    elevation_cost +=  250*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                    elevation_cost =  400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
                 elif st.session_state["elevation_type"] == "Steep":
-                    elevation_cost -= 250*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                    elevation_cost = 100 - 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
             elif st.session_state["elevation_penalty"] == "Exponential":
                 if st.session_state["elevation_type"] == "Flat":
-                    elevation_cost += math.pow(2, min(5.6435,20*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))))
+                    flat_lin = 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                    elevation_cost += math.pow(2,(flat_lin/100.0)*6.6439)
                 elif st.session_state["elevation_type"] == "Steep":
-                    elevation_cost -= math.pow(2, min(5.6435,20*(np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"]))))
+                    steep_lin = 100 - 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
+                    elevation_cost -= math.pow(2, (steep_lin/100.0)*6.6439)
     if elevation_cost > 100:
       elevation_cost = 100
     elif elevation_cost < 0:
