@@ -18,9 +18,7 @@ class Label:
         for i in range(0, len(c)):
             if c[i] <= cc[i]:
                 return True
-            elif c[i] == cc[i]:
-                continue
-            else:
+            elif c[i] >= cc[i]:
                 return False
         return False
     def dominance_check(self, other):
@@ -56,7 +54,6 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
                 lastProcessedLabel[(u,v)] = k
                 #start back at line 9
                 if l_v.dominance_check(l_new):
-                    print(l_new.__lt__(l_v))
                     if l_new.__lt__(l_v):
                         l_v = l_new
                         break
@@ -82,7 +79,6 @@ def propogate(l_v, w, H,L, G):
             heapq.heapify(H)
             heapq.heappush(H,l_new)
 
-
 def one_to_all(G,source):
     H = []
     heapq.heapify(H)
@@ -101,8 +97,9 @@ def one_to_all(G,source):
 
     #line 7
     while len(H) > 0:
+        print(H)
+        print("________")
         l_v_star = heapq.heappop(H)
-        print(l_v_star)
         L[l_v_star.node].append(l_v_star)
         #heapq.heappush(H,l_v_star)
 
@@ -129,18 +126,18 @@ def main():
 
     G = nx.DiGraph()
     #pos = {1: (0, 0), 2: (-1, 0.3), 3: (2, 0.17), 4: (4, 0.255), 5: (5, 0.03)}
-    G.add_edge(1,2,length=1,elevation=10000000)
-    G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(3,2,length=1,elevation=1)
-    G.add_edge(2,3,length=1,elevation=1)
-    G.add_edge(1,3,length=1,elevation=1)
-    G.add_edge(3,1,length=1,elevation=1)
+    G.add_edge(1,2,length=100,elevation=0)
+    G.add_edge(2,1,length=1,elevation=0)
+    G.add_edge(3,2,length=1,elevation=100)
+    G.add_edge(2,3,length=1,elevation=900000)
+    G.add_edge(3,1,length=1,elevation=10100)
+
     result = one_to_all(G,2)
 
-    for i in result.values():
-       for ii in i:
-           if ii.predecessor!= -1:
-                print(ii)
+    print(len(result))
+    for x in result.values():
+        print(x[-1])
+
 
 
 
