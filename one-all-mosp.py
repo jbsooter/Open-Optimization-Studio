@@ -1,6 +1,4 @@
 import heapq
-import queue
-
 import networkx as nx
 import numpy as np
 
@@ -38,17 +36,15 @@ class Label:
             return True
         else:
             return False
-        #still need to check non equivalence?
+
     def __str__(self):
             return str(self.node) + "    pred: " + str(self.predecessor) + "    costs:  " + str(self.costs)
-
 
 def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     l_v = Label(v, [infinity, infinity],None)
 
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
-                print(len(L[u]))
                 l_u = L[u][k]
                 l_new = Label(v, np.sum([l_u.costs , [G.edges[(u,v)]["elevation"], G.edges[(u,v)]["length"]]], axis=0), l_u.node)
                 lastProcessedLabel[(u,v)] = k
@@ -63,7 +59,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     return l_v
 
 def propogate(l_v, w, H,L, G):
-    l_new = Label(w,np.sum([l_v.costs, [G.edges[(l_v.node,w)]["elevation"], G.edges[(l_v.node,w)]["length"]]], axis=0), l_v)
+    l_new = Label(w,np.sum([l_v.costs, [G.edges[(l_v.node,w)]["elevation"], G.edges[(l_v.node,w)]["length"]]], axis=0), l_v.node)
     #fix to n obj calc
     dom_check = True
     for l_w_local in L[w]:
@@ -71,10 +67,10 @@ def propogate(l_v, w, H,L, G):
             dom_check = False
 
     if dom_check:
-        if (w in H) is False:
+        if len([label for label in H if label.node == w]) <= 0:
                 heapq.heappush(H,l_new)
 
-        elif l_new.__lt__(H[w]):
+        elif l_new.__lt__([label for label in H if label.node == w][0]):
             H = [label for label in H if label.node != l_new.node]
             heapq.heapify(H)
             heapq.heappush(H,l_new)
@@ -86,8 +82,10 @@ def one_to_all(G,source):
     L = {}
 
     for v,data in G.nodes.data():
-
-        L[v] = [Label(v,[infinity, infinity],-1)]
+        if v == source:
+            L[v] = [Label(v,[0,0],None)]
+        else:
+            L[v] = [Label(v,[infinity,infinity],-1)]
 
     last_processed_label = {}
     for a in G.edges:
@@ -97,11 +95,8 @@ def one_to_all(G,source):
 
     #line 7
     while len(H) > 0:
-        print(H)
-        print("________")
         l_v_star = heapq.heappop(H)
         L[l_v_star.node].append(l_v_star)
-        #heapq.heappush(H,l_v_star)
 
         u = []
         for uu, v in G.in_edges(l_v_star.node):
@@ -126,18 +121,22 @@ def main():
 
     G = nx.DiGraph()
     #pos = {1: (0, 0), 2: (-1, 0.3), 3: (2, 0.17), 4: (4, 0.255), 5: (5, 0.03)}
-    G.add_edge(1,2,length=100,elevation=0)
-    G.add_edge(2,1,length=1,elevation=0)
-    G.add_edge(3,2,length=1,elevation=100)
-    G.add_edge(2,3,length=1,elevation=900000)
-    G.add_edge(3,1,length=1,elevation=10100)
-
+    G.add_edge(1,2,length=1,elevation=1)
+    G.add_edge(2,1,length=1,elevation=1)
+    G.add_edge(1,3,length=1,elevation=1)
+    G.add_edge(3,1,length=10,elevation=1)
+    #G.add_edge(2,3,length=100,elevation=1000)
+    #G.add_edge(3,2,length=1,elevation=1)
     result = one_to_all(G,2)
 
     print(len(result))
     for x in result.values():
         print(x[-1])
 
+    gen = nx.single_source_all_shortest_paths(G,2, weight='length')
+
+    for x in gen:
+        print(x)
 
 
 
