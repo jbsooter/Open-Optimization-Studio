@@ -133,7 +133,7 @@ def one_to_all(G,source):
 def main():
     G = nx.DiGraph()
 
-    #create graph where bi-objective would prefer 1-2-3 over 1-3 even though length cost is higher
+    print("Source 1. Case where 1-2-3 is still preferred even though distance is large, because elevation is an order of maginude larger. ")
     G.add_edge(1,2,length=1,elevation=1)
     G.add_edge(2,1,length=1,elevation=1)
     G.add_edge(1,3,length=1,elevation=1000000)
@@ -144,11 +144,11 @@ def main():
     #run multipl objective with source node 1
     result = one_to_all(G,1)
 
-    print(len(result))
+
     for x in result.values():
         print(x[-1])
 
-    #creat3e graph where second objective is == and 1-3 direct path expensive
+    print("Source 1. Case where second objective is non-factor and 1-3 direct route is expensive. ")
     G.add_edge(1,2,length=1,elevation=1)
     G.add_edge(2,1,length=1,elevation=1)
     G.add_edge(1,3,length=100,elevation=1)
@@ -159,10 +159,10 @@ def main():
     #run multipl objective with source node 1
     result = one_to_all(G,1)
 
-    print(len(result))
+
     for x in result.values():
         print(x[-1])
-    #compare to networkx one-all single objective
+    print("Source 1. Equivalent NetworkX result")
     gen = nx.single_source_all_shortest_paths(G,1, weight='length')
 
     for x in gen:
