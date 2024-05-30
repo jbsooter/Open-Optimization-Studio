@@ -13,23 +13,31 @@ class Label:
     def __lt__(self, other):
         c = self.costs
         cc = other.costs
-        for i in range(0, len(c)):
-            if c[i] <= cc[i]:
+
+        for i in range(len(c)):
+            #if equal, move to next cost
+            if c[i] == cc[i]:
+                continue
+            #if less, then true
+            elif c[i] < cc[i]:
                 return True
-            elif c[i] >= cc[i]:
+            else:
                 return False
         return False
+
     def dominance_check(self, other):
-        cc = self.costs
-        c = other.costs
+        c = self.costs
+        cc = other.costs
 
         counter = 0
 
         for i in range(0,len(c)):
             if c[i] <= cc[i]:
+                #count the better objectives
                 if c[i] < cc[i]:
                     counter += 1
-            else:
+            #if there is ever a worse, return false
+            if c[i] > cc[i]:
                 return False
 
         if counter >= 1:
@@ -46,34 +54,39 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
                 l_u = L[u][k]
-                l_new = Label(v, np.sum([l_u.costs , [G.edges[(u,v)]["elevation"], G.edges[(u,v)]["length"]]], axis=0), l_u.node)
+                if l_u.costs[0] >= infinity:
+                    l_new = Label(v, [G.edges[(u,v)]["elevation"],G.edges[(u,v)]["length"]], l_u.node)
+                else:
+                    l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u.node)
+
                 lastProcessedLabel[(u,v)] = k
-                #start back at line 9
-                if l_v.dominance_check(l_new):
+
+                if L[v][-1].dominance_check(l_new) is False:
                     if l_new.__lt__(l_v):
                         l_v = l_new
+                        L[v].append(l_v)
                         break
-    if l_v.costs[0] != infinity:
-        return None
 
+    if l_v.costs[0] is not infinity:
+        return None
     return l_v
 
 def propogate(l_v, w, H,L, G):
-    l_new = Label(w,np.sum([l_v.costs, [G.edges[(l_v.node,w)]["elevation"], G.edges[(l_v.node,w)]["length"]]], axis=0), l_v.node)
+    l_new = Label(w,[l_v.costs[0] +  G.edges[(l_v.node,w)]["elevation"], l_v.costs[1] + G.edges[(l_v.node,w)]["length"]], l_v.node)
     #fix to n obj calc
     dom_check = True
-    for l_w_local in L[w]:
-        if l_w_local.dominance_check(l_new) is False:
-            dom_check = False
 
-    if dom_check:
-        if len([label for label in H if label.node == w]) <= 0:
-                heapq.heappush(H,l_new)
+    if L[w][-1].dominance_check(l_new) is False:
 
-        elif l_new.__lt__([label for label in H if label.node == w][0]):
-            H = [label for label in H if label.node != l_new.node]
+        existing_labels = [label for label in H if label.node == w]
+        heapq.heapify(H)
+        if len(existing_labels) == 0:
+            heapq.heappush(H, l_new)
+        elif l_new.__lt__(existing_labels[0]):
+            H.remove(existing_labels[0])
             heapq.heapify(H)
-            heapq.heappush(H,l_new)
+            heapq.heappush(H, l_new)
+    return H
 
 def one_to_all(G,source):
     H = []
@@ -85,7 +98,7 @@ def one_to_all(G,source):
         if v == source:
             L[v] = [Label(v,[0,0],None)]
         else:
-            L[v] = [Label(v,[infinity,infinity],-1)]
+            L[v] = [Label(v,[infinity,infinity],None)]
 
     last_processed_label = {}
     for a in G.edges:
@@ -101,39 +114,56 @@ def one_to_all(G,source):
         u = []
         for uu, v in G.in_edges(l_v_star.node):
             u.append(uu)
+
         l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G)
         if l_v_new is not None:
             heapq.heappush(H,l_v_new)
+
 
         sigma_plus = []
         for u, v in G.out_edges(l_v_star.node):
             sigma_plus.append(v)
 
         for w in sigma_plus:
-            propogate(l_v_star,w,H,L,G)
+            H = propogate(l_v_star,w,H,L,G)
+            heapq.heapify(H)
 
     return L
 
-
-
-
 def main():
-
     G = nx.DiGraph()
-    #pos = {1: (0, 0), 2: (-1, 0.3), 3: (2, 0.17), 4: (4, 0.255), 5: (5, 0.03)}
+
+    #create graph where bi-objective would prefer 1-2-3 over 1-3 even though length cost is higher
     G.add_edge(1,2,length=1,elevation=1)
     G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(1,3,length=1,elevation=1)
-    G.add_edge(3,1,length=10,elevation=1)
-    #G.add_edge(2,3,length=100,elevation=1000)
-    #G.add_edge(3,2,length=1,elevation=1)
-    result = one_to_all(G,2)
+    G.add_edge(1,3,length=1,elevation=1000000)
+    G.add_edge(3,1,length=1,elevation=1)
+    G.add_edge(2,3,length=100000,elevation=100000)
+    G.add_edge(3,2,length=1,elevation=1)
+
+    #run multipl objective with source node 1
+    result = one_to_all(G,1)
 
     print(len(result))
     for x in result.values():
         print(x[-1])
 
-    gen = nx.single_source_all_shortest_paths(G,2, weight='length')
+    #creat3e graph where second objective is == and 1-3 direct path expensive
+    G.add_edge(1,2,length=1,elevation=1)
+    G.add_edge(2,1,length=1,elevation=1)
+    G.add_edge(1,3,length=100,elevation=1)
+    G.add_edge(3,1,length=1,elevation=1)
+    G.add_edge(2,3,length=1,elevation=1)
+    G.add_edge(3,2,length=1,elevation=1)
+
+    #run multipl objective with source node 1
+    result = one_to_all(G,1)
+
+    print(len(result))
+    for x in result.values():
+        print(x[-1])
+    #compare to networkx one-all single objective
+    gen = nx.single_source_all_shortest_paths(G,1, weight='length')
 
     for x in gen:
         print(x)
