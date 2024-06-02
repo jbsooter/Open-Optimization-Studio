@@ -61,7 +61,8 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
                 if L[v][-1].dominance_check(l_new) is False:
                     if l_new.__lt__(l_v):
                         l_v = l_new
-                        L[v].append(l_v)
+                        #L[v].append(l_v)
+                        print("hit")
                         break
 
     if l_v.costs[0] is not infinity:
@@ -104,6 +105,7 @@ def one_to_all(G,source):
     heapq.heappush(H, Label(source,[0,0],None))
 
     #line 7
+    count = 0
     while len(H) > 0:
         l_v_star = heapq.heappop(H)
         L[l_v_star.node].append(l_v_star)
@@ -125,6 +127,15 @@ def one_to_all(G,source):
             H = propogate(l_v_star,w,H,L,G)
             heapq.heapify(H)
 
+
+        #print("iteration")
+        #print(count)
+        #count = count + 1
+        #for x in L.values():
+            #print(x[-1])
+        #    for xx in x:
+        #        print(xx)
+
     return L
 
 def main():
@@ -142,6 +153,7 @@ def main():
     result = one_to_all(G,1)
 
 
+    print("overall")
     for x in result.values():
         #print(x[-1])
         for xx in x:
