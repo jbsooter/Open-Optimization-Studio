@@ -46,7 +46,7 @@ class Label:
             return False
 
     def __str__(self):
-            return str(self.node) + "    pred: " + str(self.predecessor) + "    costs:  " + str(self.costs)
+            return  str(self.node) +   "," + str(self.costs) + " <- " + str(self.predecessor)
 
 def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     l_v = Label(v, [infinity, infinity],None)
@@ -54,7 +54,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
                 l_u = L[u][k]
-                l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u.node)
+                l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u)
 
                 lastProcessedLabel[(u,v)] = k
 
@@ -69,7 +69,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     return l_v
 
 def propogate(l_v, w, H,L, G):
-    l_new = Label(w,[l_v.costs[0] +  G.edges[(l_v.node,w)]["elevation"], l_v.costs[1] + G.edges[(l_v.node,w)]["length"]], l_v.node)
+    l_new = Label(w,[l_v.costs[0] +  G.edges[(l_v.node,w)]["elevation"], l_v.costs[1] + G.edges[(l_v.node,w)]["length"]], l_v)
     #fix to n obj calc
     dom_check = True
 
@@ -143,28 +143,11 @@ def main():
 
 
     for x in result.values():
+        #print(x[-1])
         for xx in x:
             print(xx)
 
-    print("Source 1. Case where second objective is non-factor and 1-3 direct route is expensive. ")
-    G.add_edge(1,2,length=1,elevation=1)
-    G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(1,3,length=100,elevation=1)
-    G.add_edge(3,1,length=1,elevation=1)
-    G.add_edge(2,3,length=1,elevation=1)
-    G.add_edge(3,2,length=1,elevation=1)
 
-    #run multipl objective with source node 1
-    result = one_to_all(G,1)
-
-
-    for x in result.values():
-        print(x[-1])
-    print("Source 1. Equivalent NetworkX result")
-    gen = nx.single_source_all_shortest_paths(G,1, weight='length')
-
-    for x in gen:
-        print(x)
 
 
 
