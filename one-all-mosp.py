@@ -1,4 +1,6 @@
 import heapq
+import random
+
 import networkx as nx
 import numpy as np
 
@@ -46,7 +48,7 @@ class Label:
             return False
 
     def __str__(self):
-            return  str(self.node) +   "," + str(self.costs) + " <- " + str(self.predecessor)
+            return  str(self.node) + " <- " + str(self.predecessor)
 
 def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     l_v = Label(v, [infinity, infinity],None)
@@ -61,8 +63,6 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
                 if L[v][-1].dominance_check(l_new) is False:
                     if l_new.__lt__(l_v):
                         l_v = l_new
-                        #L[v].append(l_v)
-                        print("hit")
                         break
 
     if l_v.costs[0] is not infinity:
@@ -141,23 +141,70 @@ def one_to_all(G,source):
 def main():
     G = nx.DiGraph()
 
-    print("Source 1. Case where 1-2-3 is still preferred even though distance is large, because elevation is an order of maginude larger. ")
-    G.add_edge(1,2,length=1,elevation=1)
+    print("Source is 1. Small case where 1-2-3 is still preferred even though distance is large, because elevation is an order of maginude larger. ")
+    G.add_edge(1,2,length=27,elevation=1)
     G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(1,3,length=1,elevation=1000000)
+    G.add_edge(1,3,length=1,elevation=1)
     G.add_edge(3,1,length=1,elevation=1)
-    G.add_edge(2,3,length=100000,elevation=100000)
+    G.add_edge(2,3,length=1,elevation=1)
     G.add_edge(3,2,length=1,elevation=1)
+
+    #run multiple objective with source node 1
+    result = one_to_all(G,1)
+
+
+    print("MOSP solution")
+    for x in result.values():
+        for xx in x:
+            print(xx)
+
+
+    print("Source is 1. Generated, complete graph case, single objective, alternate optimal")
+    # Generate a complete graph w/ 10 nodes and add random edges
+    complete_graph = nx.complete_graph(10)
+    G = nx.DiGraph()
+
+    G.add_nodes_from(complete_graph.nodes)
+
+    random.seed(0)
+    for u, v in complete_graph.edges:
+            G.add_edge(u, v, length=random.randint(1,10), elevation=1)
+            G.add_edge(v, u,length=random.randint(1,10), elevation=1)
 
     #run multipl objective with source node 1
     result = one_to_all(G,1)
 
 
-    print("overall")
+    print("MOSP Solution")
     for x in result.values():
-        #print(x[-1])
         for xx in x:
             print(xx)
+
+    print("NextworkX solution")
+    gen = nx.single_source_all_shortest_paths(G,source = 1,weight='length')
+    for x in gen:
+        print(x)
+
+    print("Source is 1. Generated, half of arcs removed, single objective, alternate optimal")
+    for u, v in complete_graph.edges:
+        if random.random() > 0.5:
+            G.remove_edge(u,v)
+
+            #run multipl objective with source node 1
+    result = one_to_all(G,1)
+
+
+    print("MOSP solution")
+    for x in result.values():
+        for xx in x:
+            print(xx)
+
+
+    gen = nx.single_source_all_shortest_paths(G,source = 1,weight='length')
+    print("NetworkX solution")
+    for x in gen:
+        print(x)
+
 
 
 
