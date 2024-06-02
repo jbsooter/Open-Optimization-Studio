@@ -54,10 +54,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
                 l_u = L[u][k]
-                if l_u.costs[0] >= infinity:
-                    l_new = Label(v, [G.edges[(u,v)]["elevation"],G.edges[(u,v)]["length"]], l_u.node)
-                else:
-                    l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u.node)
+                l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u.node)
 
                 lastProcessedLabel[(u,v)] = k
 
@@ -146,7 +143,8 @@ def main():
 
 
     for x in result.values():
-        print(x[-1])
+        for xx in x:
+            print(xx)
 
     print("Source 1. Case where second objective is non-factor and 1-3 direct route is expensive. ")
     G.add_edge(1,2,length=1,elevation=1)
