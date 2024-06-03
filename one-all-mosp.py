@@ -165,7 +165,7 @@ def main():
         print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
 
 
-    print("Source is 1. Generated, complete graph case, single objective, alternate optimal")
+    print("Source is 1. Generated, complete graph case, single objective")
     # Generate a complete graph w/ 10 nodes and add random edges
     complete_graph = nx.complete_graph(10)
     G = nx.DiGraph()
@@ -174,8 +174,8 @@ def main():
 
     random.seed(0)
     for u, v in complete_graph.edges:
-            G.add_edge(u, v, length=random.randint(1,10), elevation=1)
-            G.add_edge(v, u,length=random.randint(1,10), elevation=1)
+            G.add_edge(u, v, length=random.randint(1,10), elevation=0)
+            G.add_edge(v, u,length=random.randint(1,10), elevation=0)
 
     #run multipl objective with source node 1
     result = one_to_all(G,1)
