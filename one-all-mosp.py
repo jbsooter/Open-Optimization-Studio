@@ -11,6 +11,13 @@ class Label:
         self.node = node
         self.costs = costs
         self.predecessor = predecessor
+        self.label_list = []
+        if predecessor is not None:
+            for x in self.predecessor.label_list:
+                self.label_list.append(x)
+            self.label_list.append(node)
+        else:
+            self.label_list.append(node)
     #define priority according to "lexographic min" analogous to java comparator
     def __lt__(self, other):
         c = self.costs
@@ -48,7 +55,7 @@ class Label:
             return False
 
     def __str__(self):
-            return  str(self.node) + " <- " + str(self.predecessor)
+            return  str(self.node) + " <- " + str(self.predecessor) + str(self.label_list)
 
 def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     l_v = Label(v, [infinity, infinity],None)
@@ -142,11 +149,11 @@ def main():
     G = nx.DiGraph()
 
     print("Source is 1. Small case where 1-2-3 is still preferred even though distance is large, because elevation is an order of maginude larger. ")
-    G.add_edge(1,2,length=27,elevation=1)
+    G.add_edge(1,2,length=1,elevation=1)
     G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(1,3,length=1,elevation=1)
+    G.add_edge(1,3,length=1,elevation=1000000)
     G.add_edge(3,1,length=1,elevation=1)
-    G.add_edge(2,3,length=1,elevation=1)
+    G.add_edge(2,3,length=100000,elevation=100000)
     G.add_edge(3,2,length=1,elevation=1)
 
     #run multiple objective with source node 1
@@ -155,8 +162,7 @@ def main():
 
     print("MOSP solution")
     for x in result.values():
-        for xx in x:
-            print(xx)
+        print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
 
 
     print("Source is 1. Generated, complete graph case, single objective, alternate optimal")
@@ -177,8 +183,7 @@ def main():
 
     print("MOSP Solution")
     for x in result.values():
-        for xx in x:
-            print(xx)
+        print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
 
     print("NextworkX solution")
     gen = nx.single_source_all_shortest_paths(G,source = 1,weight='length')
@@ -196,8 +201,7 @@ def main():
 
     print("MOSP solution")
     for x in result.values():
-        for xx in x:
-            print(xx)
+        print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
 
 
     gen = nx.single_source_all_shortest_paths(G,source = 1,weight='length')
