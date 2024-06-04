@@ -121,10 +121,16 @@ def one_to_all(G,source):
         for uu, v in G.in_edges(l_v_star.node):
             u.append(uu)
 
+        #running nextCandidate only for source
+        #if l_v_star.node is source:
+            #l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G)
+            #if l_v_new is not None:
+            #    heapq.heappush(H,l_v_new)
+
+        #running nextCandidate as described in MOSP paper
         l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G)
         if l_v_new is not None:
             heapq.heappush(H,l_v_new)
-
 
         sigma_plus = []
         for u, v in G.out_edges(l_v_star.node):
