@@ -23,6 +23,7 @@ from streamlit_js_eval import get_geolocation
 
 from utilities import config
 
+from utilities import one_all_mosp
 #useful tag config
 osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'name',
                                  'highway', 'maxspeed', 'service', 'access', 'area',
@@ -53,7 +54,7 @@ def build_cache_support(address, map_mode):
     #run build graph, if same, no queries, otherwise, queries update graph session state
     build_graph(address, map_mode, st.session_state["mileage"])
     #build route based on opt criteria
-    build_route()
+    build_route_mosp()
 
 def route_similarity(routeA,routeB):
     sim_pct = 0
@@ -112,7 +113,7 @@ def build_graph(address,map_mode, mileage):
                     st.error("open-elevation.com appears to be experiencing downtime. Please try again later. ")
                     return
 
-    build_route()
+    build_route_mosp()
 
 def cost_function(way,start_node,end_node):
     #all 100 to make easier to track weights
@@ -184,6 +185,60 @@ def cost_function(way,start_node,end_node):
             + st.session_state["speed_weight"]*speed_cost)
 
     return cost*way["length"] #more costly if lasts longer debating this
+
+def build_route_mosp():
+    st.session_state["gpx_file"] = None #clear download button
+
+    with st.spinner("Computing Routes"):
+        for u, v, data in st.session_state["running_graph"].edges(data=True):
+            data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],0]
+        # set source and sink
+        source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+        #get node ids that are on the last graph 1-mi of the considered area
+        rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
+        #osmnx.simplify_graph(rg_local)
+
+        rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
+        #osmnx.simplify_graph(rbg_local)
+        result = [i for i in rg_local if i not in rbg_local]
+        #guaruntee node uniwqueness
+        result = set(result)
+        result = list(result)
+        #-----------
+
+        L = one_all_mosp.one_to_all(st.session_state["running_graph"],source_return,2)
+
+        results = []
+        for label in L.values():
+            label = label[-1]
+            if label.node in result:
+                if len(results) > 0:
+                    add = True
+                    for x in results:
+                        if route_similarity(x[-1],label.label_list) < .9:
+                            continue
+                        else:
+                            add = False
+                            break
+                    if add:
+                        length_m = 0
+                        for i in range(0,len(label.label_list)-1):
+                            length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
+
+                        results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
+                else:
+                    length_m = 0
+                    for i in range(0,len(label.label_list)-1):
+                        length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
+                    results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,1.0,label.label_list])
+
+        results.sort(key = lambda row: row[3])
+        results = results[0:10]
+
+        st.session_state["running_route_results"] = results
+        st.session_state["route_iter"] = 0
+        st.session_state["route_iter_max"] = len(results)
+
 
 def build_route():
     st.session_state["gpx_file"] = None #clear download button
@@ -440,7 +495,7 @@ def main():
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
-            st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
+            #st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
             ##GPX Download
 
             file_mem = BytesIO()

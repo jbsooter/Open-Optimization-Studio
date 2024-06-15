@@ -62,12 +62,12 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G,num_objs):
     l_v = Label(v, num_objs*[infinity],None)
 
     for u in sigma:
-        for k in range(lastProcessedLabel[(u,v)],len(L[u])):
+        for k in range(lastProcessedLabel[(u,v,0)],len(L[u])):
                 l_u = L[u][k]
-                l_new = Label(v, [label_costs + new_costs for label_costs, new_costs in zip(l_u.costs,G.edges[(u,v)]["costs"])], l_u)
+                l_new = Label(v, [label_costs + new_costs for label_costs, new_costs in zip(l_u.costs,G.edges[(u,v,0)]["costs"])], l_u)
 
                 #print(l_new.costs)
-                lastProcessedLabel[(u,v)] = k
+                lastProcessedLabel[(u,v,0)] = k
 
                 if L[v][-1].dominance_check(l_new) is False:
                     if l_new.__lt__(l_v):
@@ -79,7 +79,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G,num_objs):
     return l_v
 
 def propogate(l_v, w, H,L, G):
-    l_new = Label(w,[label_costs + new_costs for label_costs, new_costs in zip(l_v.costs,G.edges[(l_v.node,w)]["costs"])], l_v)
+    l_new = Label(w,[label_costs + new_costs for label_costs, new_costs in zip(l_v.costs,G.edges[(l_v.node,w,0)]["costs"])], l_v)
     #print(l_new.costs)
     if L[w][-1].dominance_check(l_new) is False:
         existing_labels = [label for label in H if label.node == w]
@@ -106,6 +106,7 @@ def one_to_all(G,source,num_objs):
 
     last_processed_label = {}
     for a in G.edges:
+        print(a)
         last_processed_label[a] = 0
 
     heapq.heappush(H, Label(source,num_objs*[0],None))
