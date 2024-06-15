@@ -57,8 +57,8 @@ class Label:
     def __str__(self):
             return  str(self.node) + " <- " + str(self.predecessor) + str(self.label_list)
 
-def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
-    l_v = Label(v, [infinity, infinity],None)
+def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G,num_objs):
+    l_v = Label(v, num_objs*[infinity],None)
 
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
@@ -73,15 +73,14 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
                         l_v = l_new
                         break
 
-    if l_v.costs[0] is not infinity:
+    if l_v.costs is not len(l_v.costs) * [infinity]:
         return None
     return l_v
 
 def propogate(l_v, w, H,L, G):
     l_new = Label(w,[label_costs + new_costs for label_costs, new_costs in zip(l_v.costs,G.edges[(l_v.node,w)]["costs"])], l_v)
-
+    #print(l_new.costs)
     if L[w][-1].dominance_check(l_new) is False:
-
         existing_labels = [label for label in H if label.node == w]
         heapq.heapify(H)
         if len(existing_labels) == 0:
@@ -92,7 +91,7 @@ def propogate(l_v, w, H,L, G):
             heapq.heappush(H, l_new)
     return H
 
-def one_to_all(G,source):
+def one_to_all(G,source,num_objs):
     H = []
     heapq.heapify(H)
 
@@ -100,15 +99,15 @@ def one_to_all(G,source):
 
     for v,data in G.nodes.data():
         if v == source:
-            L[v] = [Label(v,[0,0],None)]
+            L[v] = [Label(v,num_objs*[0],None)]
         else:
-            L[v] = [Label(v,[infinity,infinity],None)]
+            L[v] = [Label(v,num_objs*[infinity],None)]
 
     last_processed_label = {}
     for a in G.edges:
         last_processed_label[a] = 0
 
-    heapq.heappush(H, Label(source,[0,0],None))
+    heapq.heappush(H, Label(source,num_objs*[0],None))
 
     #line 7
     count = 0
@@ -127,7 +126,7 @@ def one_to_all(G,source):
             #    heapq.heappush(H,l_v_new)
 
         #running nextCandidate as described in MOSP paper
-        l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G)
+        l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G,num_objs)
         if l_v_new is not None:
             heapq.heappush(H,l_v_new)
 
@@ -140,13 +139,13 @@ def one_to_all(G,source):
             heapq.heapify(H)
 
 
-        #print("iteration")
-        #print(count)
-        #count = count + 1
-        #for x in L.values():
-            #print(x[-1])
-        #    for xx in x:
-        #        print(xx)
+        print("iteration")
+        print(count)
+        count = count + 1
+        for x in L.values():
+            print(x[-1])
+            for xx in x:
+                print(xx)
 
     return L
 
@@ -162,7 +161,7 @@ def main():
     G.add_edge(3,2,costs=[1,1])
 
     #run multiple objective with source node 1
-    result = one_to_all(G,1)
+    result = one_to_all(G,1,2)
 
 
     print("MOSP solution")
@@ -179,11 +178,11 @@ def main():
 
     random.seed(0)
     for u, v in complete_graph.edges:
-            G.add_edge(u, v, costs=[random.randint(1,10), 0])
-            G.add_edge(v, u,costs=[random.randint(1,10), 0])
+            G.add_edge(u, v, costs=[0,random.randint(1,10)])
+            G.add_edge(v, u,costs=[ 0,random.randint(1,10)])
 
     #run multipl objective with source node 1
-    result = one_to_all(G,1)
+    result = one_to_all(G,1,2)
 
 
     print("MOSP Solution")
@@ -201,12 +200,33 @@ def main():
             G.remove_edge(u,v)
 
             #run multipl objective with source node 1
-    result = one_to_all(G,1)
+    result = one_to_all(G,1,2)
 
 
     print("MOSP solution")
     for x in result.values():
         print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
+
+    #paper example 1
+    #cg = nx.complete_graph(range(0,5))
+
+    G = nx.DiGraph()
+
+    G.add_edge(0,1,costs=[1,0,2])
+    G.add_edge(0,3,costs=[3,3,0])
+    G.add_edge(0,2,costs=[2,2,2])
+    G.add_edge(2,3,costs=[1,0,0])
+    G.add_edge(2,4,costs=[10,10,10])
+    G.add_edge(1,3,costs=[2,1,1])
+    G.add_edge(3,4,costs=[2,1,0])
+    G.add_edge(3,5,costs=[5,5,5])
+    G.add_edge(4,5,costs=[2,2,0])
+
+    result = one_to_all(G,0,3)
+
+    print("MOSP solution paper example 1 ")
+    for x in result.values():
+       print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
 
 if __name__ == "__main__":
     main()
