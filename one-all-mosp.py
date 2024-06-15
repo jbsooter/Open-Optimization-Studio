@@ -1,5 +1,6 @@
 import heapq
 import random
+import time
 
 import networkx as nx
 import numpy as np
@@ -121,9 +122,9 @@ def one_to_all(G,source,num_objs):
 
         #running nextCandidate only for source
         #if l_v_star.node is source:
-            #l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G)
-            #if l_v_new is not None:
-            #    heapq.heappush(H,l_v_new)
+        #    l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G,num_objs)
+        #    if l_v_new is not None:
+        #        heapq.heappush(H,l_v_new)
 
         #running nextCandidate as described in MOSP paper
         l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G,num_objs)
@@ -139,13 +140,13 @@ def one_to_all(G,source,num_objs):
             heapq.heapify(H)
 
 
-        print("iteration")
-        print(count)
-        count = count + 1
-        for x in L.values():
-            print(x[-1])
-            for xx in x:
-                print(xx)
+        #print("iteration")
+        #print(count)
+        #count = count + 1
+        #for x in L.values():
+         #   print(x[-1])
+        #    for xx in x:
+         #       print(xx)
 
     return L
 
@@ -222,8 +223,9 @@ def main():
     G.add_edge(3,5,costs=[5,5,5])
     G.add_edge(4,5,costs=[2,2,0])
 
+    start = time.time_ns()
     result = one_to_all(G,0,3)
-
+    print(time.time_ns() - start)
     print("MOSP solution paper example 1 ")
     for x in result.values():
        print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
