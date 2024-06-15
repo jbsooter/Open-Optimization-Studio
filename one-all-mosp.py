@@ -63,8 +63,9 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     for u in sigma:
         for k in range(lastProcessedLabel[(u,v)],len(L[u])):
                 l_u = L[u][k]
-                l_new = Label(v, [l_u.costs[0] + G.edges[(u,v)]["elevation"],l_u.costs[1]+ G.edges[(u,v)]["length"]], l_u)
+                l_new = Label(v, [label_costs + new_costs for label_costs, new_costs in zip(l_u.costs,G.edges[(u,v)]["costs"])], l_u)
 
+                #print(l_new.costs)
                 lastProcessedLabel[(u,v)] = k
 
                 if L[v][-1].dominance_check(l_new) is False:
@@ -77,9 +78,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G):
     return l_v
 
 def propogate(l_v, w, H,L, G):
-    l_new = Label(w,[l_v.costs[0] +  G.edges[(l_v.node,w)]["elevation"], l_v.costs[1] + G.edges[(l_v.node,w)]["length"]], l_v)
-    #fix to n obj calc
-    dom_check = True
+    l_new = Label(w,[label_costs + new_costs for label_costs, new_costs in zip(l_v.costs,G.edges[(l_v.node,w)]["costs"])], l_v)
 
     if L[w][-1].dominance_check(l_new) is False:
 
@@ -155,12 +154,12 @@ def main():
     G = nx.DiGraph()
 
     print("Source is 1. Small case where 1-2-3 is still preferred even though distance is large, because elevation is an order of maginude larger. ")
-    G.add_edge(1,2,length=1,elevation=1)
-    G.add_edge(2,1,length=1,elevation=1)
-    G.add_edge(1,3,length=1,elevation=1000000)
-    G.add_edge(3,1,length=1,elevation=1)
-    G.add_edge(2,3,length=100000,elevation=100000)
-    G.add_edge(3,2,length=1,elevation=1)
+    G.add_edge(1,2,costs=[1,1])
+    G.add_edge(2,1,costs = [1,1])
+    G.add_edge(1,3,costs=[1,1000000000])
+    G.add_edge(3,1,costs=[1,1])
+    G.add_edge(2,3,costs=[100000,100000])
+    G.add_edge(3,2,costs=[1,1])
 
     #run multiple objective with source node 1
     result = one_to_all(G,1)
@@ -180,8 +179,8 @@ def main():
 
     random.seed(0)
     for u, v in complete_graph.edges:
-            G.add_edge(u, v, length=random.randint(1,10), elevation=0)
-            G.add_edge(v, u,length=random.randint(1,10), elevation=0)
+            G.add_edge(u, v, costs=[random.randint(1,10), 0])
+            G.add_edge(v, u,costs=[random.randint(1,10), 0])
 
     #run multipl objective with source node 1
     result = one_to_all(G,1)
@@ -208,17 +207,6 @@ def main():
     print("MOSP solution")
     for x in result.values():
         print(str(x[-1].label_list) + ", costs: " + str(x[-1].costs))
-
-
-    gen = nx.single_source_all_shortest_paths(G,source = 1,weight='length')
-    print("NetworkX solution")
-    for x in gen:
-        print(x)
-
-
-
-
-
 
 if __name__ == "__main__":
     main()
