@@ -92,10 +92,11 @@ def build_graph(address,map_mode, mileage):
                 rgs.append(r_i)
                 rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
-            st.session_state["running_graph"] = nx.compose_all(rgs)
-            st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
+            st.session_state["running_graph"] = osmnx.simplify_graph(nx.compose_all(rgs))
+            st.session_state["running_boundary_graph"] = osmnx.simplify_graph(nx.compose_all(rgs_b))
 
     with st.spinner(text="Requesting Elevation Data"):
+        st.write("elevation")
         attempts = 0
         while True:
             try:
@@ -115,6 +116,24 @@ def build_graph(address,map_mode, mileage):
 
     build_route_mosp()
 
+
+def type_cost(way):
+    type_cost = 0
+    if "highway" in way:
+        if way["highway"] in ["primary","motorway","primary_link"]:
+            type_cost = 100
+        elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
+            type_cost = 50
+    #prefer cycleways
+    if st.session_state["greenway_preference"]:
+        if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
+            type_cost  = 0
+
+        if "foot" in way:
+            if way["foot"] in ["designated","yes"]:
+                type_cost = 0
+
+    return type_cost
 def cost_function(way,start_node,end_node):
     #all 100 to make easier to track weights
     turn_cost = 0
@@ -191,7 +210,10 @@ def build_route_mosp():
 
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
-            data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],0]
+            data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],
+                             #data["length"],
+                             type_cost(data)
+                             ]
         # set source and sink
         source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
         #get node ids that are on the last graph 1-mi of the considered area

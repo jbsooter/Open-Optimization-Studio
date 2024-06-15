@@ -58,6 +58,26 @@ class Label:
     def __str__(self):
             return  str(self.node) + " <- " + str(self.predecessor) + str(self.label_list)
 
+def scale_edge_costs(G, num_objs):
+    maxes = num_objs*[0]
+    mins = num_objs*[infinity]
+    for u,v,edge in G.edges(data=True):
+        for i in range(0,len(edge["costs"])):
+            if edge["costs"][i] > maxes[i]:
+                maxes[i] = edge["costs"][i]
+            if edge["costs"][i] < mins[i]:
+                mins[i] = edge["costs"][i]
+
+    def scale_value(x, min_val, max_val):
+        if max_val == min_val:
+            return 0
+        return 100 * (x - min_val) / (max_val - min_val)
+
+    for u,v,edge in G.edges(data=True):
+        for i in range(0,len(edge["costs"])):
+            edge["costs"][i] = scale_value(edge["costs"][i],mins[i],maxes[i])
+
+    return G
 def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G,num_objs):
     l_v = Label(v, num_objs*[infinity],None)
 
@@ -93,6 +113,8 @@ def propogate(l_v, w, H,L, G):
     return H
 
 def one_to_all(G,source,num_objs):
+
+    G = scale_edge_costs(G, num_objs)
     H = []
     heapq.heapify(H)
 
