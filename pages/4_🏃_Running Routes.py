@@ -1,4 +1,5 @@
 import datetime
+import math
 import time
 
 import geopandas
@@ -108,7 +109,7 @@ def build_graph(address,map_mode, mileage):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=0.9*mileage*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=0.7*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
                 rgs_b.append(osmnx.graph_from_point(address, dist=(0.8*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
@@ -123,13 +124,13 @@ def build_graph(address,map_mode, mileage):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.9*mileage*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.7*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
                 rgs_b.append(osmnx.graph_from_address(address, dist=(0.8*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
-            st.session_state["running_graph"] = osmnx.simplify_graph(nx.compose_all(rgs))
-            st.session_state["running_boundary_graph"] = osmnx.simplify_graph(nx.compose_all(rgs_b))
+            st.session_state["running_graph"] = nx.compose_all(rgs)
+            st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
 
     with st.spinner(text="Requesting Elevation Data"):
         attempts = 0
@@ -160,29 +161,36 @@ def type_cost(way):
         elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
             type_cost = 50
     #prefer cycleways
-    if st.session_state["greenway_preference"]:
-        if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
-            type_cost  = 0
 
-        if "foot" in way:
-            if way["foot"] in ["designated","yes"]:
-                type_cost = 0
+    if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
+        type_cost  = 0
 
-    return type_cost
+    if "foot" in way:
+        if way["foot"] in ["designated","yes"]:
+            type_cost = 0
+
+    return type_cost*way["length"]
 
 def turn_cost(way):
-    turn_cost = 100
-    if way["length"] < 1000:
-        turn_cost = 50
-    if way["length"] < 500:
-        turn_cost = 0
+    turn_cost = 0
+    if st.session_state["turn_type"] == "Many Turns":
+        turn_cost = min(100.0,int(way["length"])/10000.0)
+    elif st.session_state["turn_type"] == "Few Turns":
+        turn_cost = 100 - min(100.0,int(way["length"])/10000.0)
     return turn_cost
+
+def elevation_cost(node_a, node_b, way):
+    if st.session_state["elevation_type"] == "Flat":
+        return way["length"]*(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/st.session_state["running_graph"].nodes()[node_a]["elevation"])
+    elif st.session_state["elevation_type"]   == "Steep":
+        return way["length"]*(1.0 - ((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/st.session_state["running_graph"].nodes()[node_a]["elevation"]))
+
 def build_route_mosp():
     st.session_state["gpx_file"] = None #clear download button
 
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
-            data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],
+            data["costs"] = [elevation_cost(u,v,data),
                              turn_cost(data),
                              type_cost(data)
                              ]
@@ -226,7 +234,8 @@ def build_route_mosp():
                         length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
                     results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
 
-        results = pareto_sort(results)
+        #results = pareto_sort(results)
+        results = sorted(results, key = lambda x:sum(x[3]))
         results = results[0:10]
 
         st.session_state["running_route_results"] = results
@@ -294,21 +303,7 @@ def main():
         with col1:
             st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
             st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
-            st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
 
-            st.slider("Grade Importance: ", min_value=0, max_value=100, value=25, key="grade_weight")
-            st.slider("Turns Importance: ", min_value=0, max_value=100, value=25, key="turns_weight")
-            st.number_input("Number of Routes to Generate", value=config.running_opts["out_back_node_n"], key="routes_to_generate")
-
-        with col2:
-            st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
-            st.radio("Penalty",["Linear","Exponential"], key="turn_penalty")
-            st.toggle("Prefer Greenway", value=True,key="greenway_preference")
-
-            for x in range(0,1):
-                st.write(" ")
-            st.slider("Road Type Importance: ", min_value=0, max_value=100, value=25, key="road_type_weight")
-            st.slider("Speed Importance: ", min_value=0, max_value=100, value=25, key="speed_weight")
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
 
@@ -378,7 +373,7 @@ def main():
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
             st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][3])
-            st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][6])
+            #st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][6])
             #st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
             ##GPX Download
 

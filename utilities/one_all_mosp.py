@@ -127,7 +127,7 @@ def propogate(l_v, w, H,L, G):
 
 def one_to_all(G,source,num_objs):
 
-    #G = scale_edge_costs(G, num_objs)
+    G = scale_edge_costs(G, num_objs)
     H = []
     heapq.heapify(H)
 
