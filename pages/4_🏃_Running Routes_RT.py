@@ -1,6 +1,8 @@
+import copy
 import datetime
 import math
 import time
+import random
 
 import geopandas
 import networkx as nx
@@ -12,6 +14,7 @@ import streamlit as st
 import streamlit_folium
 import folium
 import streamlit_searchbox
+from networkx import NetworkXError
 
 from openrouteservice import geocode
 from shapely import LineString
@@ -25,8 +28,8 @@ from utilities import one_all_mosp
 
 #useful tag config
 osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'name',
-                                 'highway', 'maxspeed', 'service', 'access', 'area',
-                                 'landuse', 'width', 'est_width', 'junction', 'surface','length','foot']
+                                'highway', 'maxspeed', 'service', 'access', 'area',
+                                'landuse', 'width', 'est_width', 'junction', 'surface','length','foot']
 
 osmnx.settings.useful_tags_node = ['name','lit','amenity']
 
@@ -109,10 +112,10 @@ def build_graph(address,map_mode, mileage):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=0.7*mileage*1609.34/2, dist_type='bbox',
-                                                                                                             simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.8*mileage)*1609.34/2, dist_type='bbox',
-                                                                                    simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
+                rgs.append(osmnx.graph_from_point(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
+                                                  simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
+                rgs_b.append(osmnx.graph_from_point(address, dist=(1.0*mileage)*1609.34/2, dist_type='bbox',
+                                                    simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -128,27 +131,33 @@ def build_graph(address,map_mode, mileage):
                 st.session_state["address_coords"] = coords
                 coords = (coords[0] + (mileage/(2*3.14))/69.0,coords[1] + (mileage/(2*3.14))/54.6)
 
-                r_i = osmnx.graph_from_point(coords, dist=0.9*(mileage/2*3.14)*1609.34, dist_type='bbox',
-                                                             simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x, )
+                r_i = osmnx.graph_from_point(coords, dist=1.1*(mileage/2*3.14)*1609.34, dist_type='network',
+                                             simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_point(coords,  dist=1.1*(mileage/2*3.14)*1609.34, dist_type='bbox',
-                                                                                simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
+                rgs_b.append(osmnx.graph_from_point(coords,  dist=0.9*(mileage/2*3.14)*1609.34, dist_type='network',
+                                                    simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
 
-            iterator_graph = st.session_state["running_boundary_graph"].copy()
+            iterator_graph = copy.deepcopy(st.session_state["running_graph"])
             for x in iterator_graph:
-                if x in st.session_state["running_graph"]:
-                    st.session_state["running_boundary_graph"].remove_node(x)
+                if x in st.session_state["running_boundary_graph"].nodes():
+                    G = st.session_state["running_graph"]
+                    G.remove_node(x)
+                    st.session_state["running_graph"] = G
 
+
+
+            print("graph size")
+            print(st.session_state["running_graph"])
     with st.spinner(text="Requesting Elevation Data"):
         attempts = 0
         while True:
             try:
                 attempts = attempts + 1
                 #snippet to add elevation to entire graph.
-                osmnx.elevation.add_node_elevations_google(st.session_state["running_boundary_graph"],None,
-                                                       url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
+                osmnx.elevation.add_node_elevations_google(st.session_state["running_graph"],None,
+                                                           url_template = "https://api.open-elevation.com/api/v1/lookup?locations={}")
 
                 break
             except:
@@ -190,23 +199,35 @@ def turn_cost(way):
 
 def elevation_cost(node_a, node_b, way):
     if st.session_state["elevation_type"] == "Flat":
-        return way["length"]*(st.session_state["running_boundary_graph"].nodes()[node_b]["elevation"]-st.session_state["running_boundary_graph"].nodes()[node_a]["elevation"]/st.session_state["running_boundary_graph"].nodes()[node_a]["elevation"])
+        return way["length"]*(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/st.session_state["running_graph"].nodes()[node_a]["elevation"])
     elif st.session_state["elevation_type"]   == "Steep":
-        return way["length"]*(1.0 - ((st.session_state["running_boundary_graph"].nodes()[node_b]["elevation"]-st.session_state["running_boundary_graph"].nodes()[node_a]["elevation"])/st.session_state["running_boundary_graph"].nodes()[node_a]["elevation"]))
+        return way["length"]*(1.0 - ((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/st.session_state["running_graph"].nodes()[node_a]["elevation"]))
 
 def build_route_mosp():
     st.session_state["gpx_file"] = None #clear download button
 
     with st.spinner("Computing Routes"):
-        for u, v, data in st.session_state["running_boundary_graph"].edges(data=True):
+        for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["costs"] = [elevation_cost(u,v,data),
                              turn_cost(data),
                              type_cost(data)
                              ]
         # set source and sink
-        source_return = osmnx.nearest_nodes(st.session_state["running_boundary_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
-        st.write(source_return)
-        L = one_all_mosp.one_to_all(st.session_state["running_boundary_graph"],source_return,3)
+        source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
+        source_adj = list(st.session_state["running_graph"].neighbors(source_return))
+        print(source_adj)
+        for s in source_adj:
+            try:
+                st.session_state["running_graph"].remove_edge(s, source_return)
+            except:
+                None
+
+            try:
+                st.session_state["running_graph"].remove_edge(source_return, s)
+            except:
+                None
+        print(source_return)
+        L = one_all_mosp.one_to_all(st.session_state["running_graph"],source_return,3)
 
         results = []
         for label in L.values():
@@ -222,18 +243,19 @@ def build_route_mosp():
                 if add:
                     length_m = 0
                     for i in range(0,len(label.label_list)-1):
-                        length_m += st.session_state["running_boundary_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
+                        length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]
 
-                    results.append([st.session_state["running_boundary_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
+                    results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
             else:
                 length_m = 0
                 for i in range(0,len(label.label_list)-1):
-                    length_m += st.session_state["running_boundary_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
-                results.append([st.session_state["running_boundary_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
+                    length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]
+                results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
 
         #results = pareto_sort(results)
         results = sorted(results, key = lambda x:x[4])
         results = results[0:10]
+        results.reverse()
 
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
@@ -349,8 +371,8 @@ def main():
         cola, colb, colc = st.columns([1,10,1])
         cola.button(label=":arrow_backward:", on_click=route_minus)
         colc.button(label=":arrow_forward:", on_click=route_plus)
-
-        st.write(st.session_state["running_route_results"])
+        #st.pyplot(nx.draw(G=st.session_state["running_boundary_graph"]))
+        #st.write(st.session_state["running_route_results"])
         sub = st.session_state["running_route_results"][st.session_state["route_iter"]][0]
         map_location = st.container()
 

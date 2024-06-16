@@ -109,9 +109,9 @@ def build_graph(address,map_mode, mileage):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=0.7*mileage*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.8*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -124,10 +124,10 @@ def build_graph(address,map_mode, mileage):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.7*mileage*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(0.8*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -352,7 +352,7 @@ def main():
         cola, colb, colc = st.columns([1,10,1])
         cola.button(label=":arrow_backward:", on_click=route_minus)
         colc.button(label=":arrow_forward:", on_click=route_plus)
-
+        st.write(st.session_state["running_route_results"])
         sub = st.session_state["running_route_results"][st.session_state["route_iter"]][0]
         map_location = st.container()
 
