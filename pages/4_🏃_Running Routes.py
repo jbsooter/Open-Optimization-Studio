@@ -352,7 +352,7 @@ def main():
         cola, colb, colc = st.columns([1,10,1])
         cola.button(label=":arrow_backward:", on_click=route_minus)
         colc.button(label=":arrow_forward:", on_click=route_plus)
-        st.write(st.session_state["running_route_results"])
+
         sub = st.session_state["running_route_results"][st.session_state["route_iter"]][0]
         map_location = st.container()
 
