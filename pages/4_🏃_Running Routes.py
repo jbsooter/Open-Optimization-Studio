@@ -1,6 +1,4 @@
 import datetime
-import math
-import random
 import time
 
 import geopandas
@@ -64,6 +62,44 @@ def route_similarity(routeA,routeB):
 
     return sim_pct/min(len(routeA),len(routeB))
 
+def dominance_check(sol1, sol2):
+    c = sol1
+    cc = sol2
+
+    counter = 0
+
+    for i in range(0,len(c)):
+        if c[i] <= cc[i]:
+            #count the better objectives
+            if c[i] < cc[i]:
+                counter += 1
+        #if there is ever a worse, return false
+        if c[i] > cc[i]:
+            return False
+
+    if counter >= 1:
+        return True
+    else:
+        return False
+
+
+def pareto_sort(solutions):
+    dominance_count = [0] * len(solutions)
+
+    # calculate dominance count
+    for i in range(0,len(solutions)):
+        for j in range(0,len(solutions)):
+            if i != j:
+                if dominance_check(solutions[i][3], solutions[j][3]):
+                    dominance_count[j] += 1
+        solutions[i].append(dominance_count[j])
+
+    #sort based on relative dominance
+    sorted_solutions = sorted(solutions, key=lambda x: x[6])
+    sorted_solutions.reverse()
+
+    return sorted_solutions
+
 @st.cache_data()
 def build_graph(address,map_mode, mileage):
     with st.spinner(text="Requesting Map Data"):
@@ -117,7 +153,7 @@ def build_graph(address,map_mode, mileage):
 
 
 def type_cost(way):
-    type_cost = 0
+    type_cost = 100
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
             type_cost = 100
@@ -134,13 +170,20 @@ def type_cost(way):
 
     return type_cost
 
+def turn_cost(way):
+    turn_cost = 100
+    if way["length"] < 1000:
+        turn_cost = 50
+    if way["length"] < 500:
+        turn_cost = 0
+    return turn_cost
 def build_route_mosp():
     st.session_state["gpx_file"] = None #clear download button
 
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],
-                             data["length"],
+                             turn_cost(data),
                              type_cost(data)
                              ]
         # set source and sink
@@ -183,7 +226,7 @@ def build_route_mosp():
                         length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
                     results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
 
-        results.sort(key = lambda row: row[3])
+        results = pareto_sort(results)
         results = results[0:10]
 
         st.session_state["running_route_results"] = results
@@ -335,6 +378,7 @@ def main():
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
             st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][3])
+            st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][6])
             #st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
             ##GPX Download
 
