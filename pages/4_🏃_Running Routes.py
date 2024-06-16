@@ -211,7 +211,7 @@ def build_route_mosp():
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["costs"] = [st.session_state["running_graph"].nodes()[v]["elevation"]-st.session_state["running_graph"].nodes()[u]["elevation"]/st.session_state["running_graph"].nodes()[u]["elevation"],
-                             #data["length"],
+                             data["length"],
                              type_cost(data)
                              ]
         # set source and sink
@@ -228,7 +228,7 @@ def build_route_mosp():
         result = list(result)
         #-----------
 
-        L = one_all_mosp.one_to_all(st.session_state["running_graph"],source_return,2)
+        L = one_all_mosp.one_to_all(st.session_state["running_graph"],source_return,3)
 
         results = []
         for label in L.values():
@@ -237,7 +237,7 @@ def build_route_mosp():
                 if len(results) > 0:
                     add = True
                     for x in results:
-                        if route_similarity(x[-1],label.label_list) < .9:
+                        if route_similarity(x[-1],label.label_list) < config.running_opts["tabu_similarity_pct"]:
                             continue
                         else:
                             add = False
@@ -252,7 +252,7 @@ def build_route_mosp():
                     length_m = 0
                     for i in range(0,len(label.label_list)-1):
                         length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
-                    results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,1.0,label.label_list])
+                    results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
 
         results.sort(key = lambda row: row[3])
         results = results[0:10]
