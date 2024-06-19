@@ -186,8 +186,6 @@ def elevation_cost(node_a, node_b, way):
         return way["length"]*(1.0 - ((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/st.session_state["running_graph"].nodes()[node_a]["elevation"]))
 
 def build_route_mosp():
-    st.session_state["gpx_file"] = None #clear download button
-
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["costs"] = [elevation_cost(u,v,data),
@@ -373,9 +371,7 @@ def main():
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
             st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][3])
-            #st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][6])
-            #st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
-            ##GPX Download
+        ##GPX Download
 
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
