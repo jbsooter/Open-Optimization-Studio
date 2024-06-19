@@ -13,6 +13,7 @@ import streamlit as st
 import streamlit_folium
 import folium
 import streamlit_searchbox
+from matplotlib import pyplot as plt
 
 from openrouteservice import geocode
 from shapely import LineString
@@ -161,13 +162,20 @@ def type_cost(way):
         elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
             type_cost = 50
     #prefer cycleways
-
     if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
-        type_cost  = 0
+        type_cost  = 25
 
+    #prefer foot and bicycle designations
     if "foot" in way:
         if way["foot"] in ["designated","yes"]:
-            type_cost = 0
+            type_cost = 25
+    if "bicycle" in way:
+        if way["bicycle"] in ["designated","yes"]:
+                type_cost =25
+
+    if "natural" in way:
+        if way["natural"] in ["tree","water","wood"]:
+            type_cost = 25
 
     return type_cost*way["length"]
 
@@ -181,9 +189,9 @@ def turn_cost(way):
 
 def elevation_cost(node_a, node_b, way):
     if st.session_state["elevation_type"] == "Flat":
-        return way["length"]*(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/st.session_state["running_graph"].nodes()[node_a]["elevation"])
+        return abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"])
     elif st.session_state["elevation_type"]   == "Steep":
-        return way["length"]*(1.0 - ((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/st.session_state["running_graph"].nodes()[node_a]["elevation"]))
+        return (1.0 - abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"]))
 
 def build_route_mosp():
     with st.spinner("Computing Routes"):
@@ -297,10 +305,10 @@ def main():
     #widget inputs
     with st.sidebar:
         st.subheader("Optimization Preferences")
-        col1, col2 = st.columns([1,1])
-        with col1:
-            st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
-            st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
+
+        st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
+        st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
+        st.write("Greenways, sidewalks, and other pedestrian-friendly paths are preferred by default. ")
 
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
@@ -366,12 +374,35 @@ def main():
         route_line = LineString([(point.x, point.y, point.elevation) for point in route_nodes.itertuples()])
 
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
-
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
+            elevation = route_nodes['elevation'].values*3.28084
+
+            # Calculate cumulative distance
+            distances = [0]
+            for i in range(0, len(route)-1):
+                try:
+                    distances.append(st.session_state["running_graph"].edges[route[i],route[i+1],0]["length"]/1609.34+distances[-1])
+                except:
+                    distances.append(distances[-1]+0)
+            # Plot elevation over distance using fig, ax style
+            fig, ax = plt.subplots(figsize=(7,4))
+            ax.plot(distances, elevation, marker='o', linestyle='-')
+            ax.set_xlabel('Distance (mi) ')
+            ax.set_ylabel('Elevation (ft)')
+            ax.set_title('Elevation')
+            ax.fill_between(distances, elevation, color='skyblue', alpha=0.4)
+            ax.set_ylim(min(elevation))
+
+            ax.grid(True)
+
+            st.pyplot(fig)
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
-            st.write(st.session_state["running_route_results"][st.session_state["route_iter"]][3])
+            st.write(f"**Elevation Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][0],2)}")
+            st.write(f"**Turn Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][1],2)}")
+            st.write(f"**Type Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][2],2)}")
         ##GPX Download
+
 
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
@@ -386,7 +417,7 @@ def main():
                                   tooltip=address).add_to(m)
                     streamlit_folium.st_folium(m, height=700, width=700)
 
-            with st.expander("Weather Report"):
+            with st.expander("Weather"):
                 st.markdown(nws_api())
 
 if __name__ == "__main__":
