@@ -1,6 +1,7 @@
 import datetime
 import math
 import time
+from random import random
 
 import geopandas
 import networkx as nx
@@ -150,7 +151,6 @@ def build_graph(address,map_mode, mileage):
                     st.error("open-elevation.com appears to be experiencing downtime. Please try again later. ")
                     return
 
-    build_route_mosp()
 
 
 def type_cost(way):
@@ -174,9 +174,9 @@ def type_cost(way):
 def turn_cost(way):
     turn_cost = 0
     if st.session_state["turn_type"] == "Many Turns":
-        turn_cost = min(100.0,int(way["length"])/10000.0)
+        turn_cost = min(10000,way["length"])
     elif st.session_state["turn_type"] == "Few Turns":
-        turn_cost = 100 - min(100.0,int(way["length"])/10000.0)
+        turn_cost =  max(10000-way["length"],0)
     return turn_cost
 
 def elevation_cost(node_a, node_b, way):
@@ -217,7 +217,7 @@ def build_route_mosp():
                 if len(results) > 0:
                     add = True
                     for x in results:
-                        if route_similarity(x[-1],label.label_list) < config.running_opts["tabu_similarity_pct"]:
+                        if route_similarity(x[-1],label.label_list) < config.running_opts["similarity_pct"]:
                             continue
                         else:
                             add = False
