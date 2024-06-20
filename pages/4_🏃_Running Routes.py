@@ -1,7 +1,7 @@
 import datetime
 import math
-import random
 import time
+from random import random
 
 import geopandas
 import networkx as nx
@@ -13,15 +13,17 @@ import streamlit as st
 import streamlit_folium
 import folium
 import streamlit_searchbox
+from matplotlib import pyplot as plt
 
 from openrouteservice import geocode
 from shapely import LineString
 from io import BytesIO
 
-from shapely.ops import substring
 from streamlit_js_eval import get_geolocation
 
 from utilities import config
+
+from utilities import one_all_mosp
 
 #useful tag config
 osmnx.settings.useful_tags_way=['bridge', 'tunnel', 'oneway', 'lanes', 'ref', 'name',
@@ -53,7 +55,7 @@ def build_cache_support(address, map_mode):
     #run build graph, if same, no queries, otherwise, queries update graph session state
     build_graph(address, map_mode, st.session_state["mileage"])
     #build route based on opt criteria
-    build_route()
+    build_route_mosp()
 
 def route_similarity(routeA,routeB):
     sim_pct = 0
@@ -63,6 +65,44 @@ def route_similarity(routeA,routeB):
 
     return sim_pct/min(len(routeA),len(routeB))
 
+# def dominance_check(sol1, sol2):
+#     c = sol1
+#     cc = sol2
+#
+#     counter = 0
+#
+#     for i in range(0,len(c)):
+#         if c[i] <= cc[i]:
+#             #count the better objectives
+#             if c[i] < cc[i]:
+#                 counter += 1
+#         #if there is ever a worse, return false
+#         if c[i] > cc[i]:
+#             return False
+#
+#     if counter >= 1:
+#         return True
+#     else:
+#         return False
+#
+#
+# def pareto_sort(solutions):
+#     dominance_count = [0] * len(solutions)
+#
+#     # calculate dominance count
+#     for i in range(0,len(solutions)):
+#         for j in range(0,len(solutions)):
+#             if i != j:
+#                 if dominance_check(solutions[i][3], solutions[j][3]):
+#                     dominance_count[j] += 1
+#         solutions[i].append(dominance_count[j])
+#
+#     #sort based on relative dominance
+#     sorted_solutions = sorted(solutions, key=lambda x: x[6])
+#     sorted_solutions.reverse()
+#
+#     return sorted_solutions
+
 @st.cache_data()
 def build_graph(address,map_mode, mileage):
     with st.spinner(text="Requesting Map Data"):
@@ -71,9 +111,9 @@ def build_graph(address,map_mode, mileage):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -86,10 +126,10 @@ def build_graph(address,map_mode, mileage):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(0.9*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -112,189 +152,93 @@ def build_graph(address,map_mode, mileage):
                     st.error("open-elevation.com appears to be experiencing downtime. Please try again later. ")
                     return
 
-    build_route()
 
-def cost_function(way,start_node,end_node):
-    #all 100 to make easier to track weights
-    turn_cost = 0
-    speed_cost = 0
-    elevation_cost = 0
-    type_cost = 0
-    #https://taginfo.openstreetmap.org/keys
 
-    #if length is less than 500 metres, penalize to reduce tons of turns
-    if "length" in way:
-        if st.session_state["turn_penalty"] =="Linear":
-            if st.session_state["turn_type"] == "Many Turns":
-                turn_cost = min(100.0,int(way["length"])/1000.0)
-            elif st.session_state["turn_type"] == "Few Turns":
-                turn_cost = 100 - min(100.0,int(way["length"])/1000.0)
-        elif st.session_state["turn_penalty"] == "Exponential":
-            if st.session_state["turn_type"] == "Many Turns":
-                turn_cost = math.pow(2,((min(100.0,int(way["length"])/1000.0))/100.0)*6.6439)
-            elif st.session_state["turn_type"] == "Few Turns":
-                turn_cost = math.pow(2,((100 - min(100.0,int(way["length"])/1000.0))/100.0)*6.6439)
-
-    #if speed limit is < 30 mph, make cheaper, if > 60 mph, make expensive
-    if "maxspeed" in way:
-        try:
-            if int(way["maxspeed"][:2]) <= st.session_state["speed_restriction"]:
-                speed_cost = 0
-            else:
-                speed_cost = 100
-        except TypeError:
-            int()
-    #avoid raods
+def type_cost(way):
+    type_cost = 100
     if "highway" in way:
         if way["highway"] in ["primary","motorway","primary_link"]:
             type_cost = 100
         elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
             type_cost = 50
-        #prefer cycleways
-        if st.session_state["greenway_preference"]:
-            if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
-                type_cost  = 0
+    #prefer cycleways
 
-            if "foot" in way:
-                if way["foot"] in ["designated","yes"]:
-                    type_cost = 0
+    if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
+        type_cost  = 25
 
-    #add 100x grade to cost per way
-    if "elevation" in start_node:
-        if "elevation" in end_node:
-            if st.session_state["elevation_penalty"] == "Linear":
-                if st.session_state["elevation_type"] == "Flat":
-                    elevation_cost =  400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-                elif st.session_state["elevation_type"] == "Steep":
-                    elevation_cost = 100 - 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-            elif st.session_state["elevation_penalty"] == "Exponential":
-                if st.session_state["elevation_type"] == "Flat":
-                    flat_lin = 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-                    elevation_cost += math.pow(2,(flat_lin/100.0)*6.6439)
-                elif st.session_state["elevation_type"] == "Steep":
-                    steep_lin = 100 - 400*np.absolute((end_node["elevation"] - start_node["elevation"])/way["length"])
-                    elevation_cost -= math.pow(2, (steep_lin/100.0)*6.6439)
-    if elevation_cost > 100:
-      elevation_cost = 100
-    elif elevation_cost < 0:
-      elevation_cost = 0
-    cost = (st.session_state["grade_weight"]*elevation_cost
-            + st.session_state["turns_weight"]*turn_cost
-            + st.session_state["road_type_weight"]*type_cost
-            + st.session_state["speed_weight"]*speed_cost)
+    if "foot" in way:
+        if way["foot"] in ["designated","yes"]:
+            type_cost = 25
 
-    return cost*way["length"] #more costly if lasts longer debating this
+    return type_cost*way["length"]
 
-def build_route():
-    st.session_state["gpx_file"] = None #clear download button
+def turn_cost(way):
+    turn_cost = 0
+    if st.session_state["turn_type"] == "Many Turns":
+        turn_cost = min(10000,way["length"])
+    elif st.session_state["turn_type"] == "Few Turns":
+        turn_cost =  max(10000-way["length"],0)
+    return turn_cost
 
+def elevation_cost(node_a, node_b, way):
+    if st.session_state["elevation_type"] == "Flat":
+        return abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"])
+    elif st.session_state["elevation_type"]   == "Steep":
+        return 1.0 - abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"])
+def build_route_mosp():
     with st.spinner("Computing Routes"):
-        #test shortest path only
-        results = []
         for u, v, data in st.session_state["running_graph"].edges(data=True):
-            data["cost"] = cost_function(data,st.session_state["running_graph"].nodes(data=True)[u],st.session_state["running_graph"].nodes(data=True)[v])
-
+            data["costs"] = [elevation_cost(u,v,data),
+                             turn_cost(data),
+                             type_cost(data)
+                             ]
         # set source and sink
         source_return = osmnx.nearest_nodes(st.session_state["running_graph"],st.session_state["address_coords"][1],st.session_state["address_coords"][0])
-
         #get node ids that are on the last graph 1-mi of the considered area
         rg_local = nx.MultiDiGraph(st.session_state["running_graph"])
-        osmnx.simplify_graph(rg_local)
+        #osmnx.simplify_graph(rg_local)
 
         rbg_local = nx.MultiDiGraph(st.session_state["running_boundary_graph"])
-        osmnx.simplify_graph(rbg_local)
+        #osmnx.simplify_graph(rbg_local)
         result = [i for i in rg_local if i not in rbg_local]
         #guaruntee node uniwqueness
         result = set(result)
         result = list(result)
+        #-----------
 
-        #tabu mechanism
-        tabu_list = []
-        #new seed based on time
-        current_time = int(time.time())
-        random.seed(current_time)
-        routes_generated = -1
+        L = one_all_mosp.one_to_all(st.session_state["running_graph"],source_return,3)
 
-        iter_count = 0
-        bestSeen = 100000000000000000000000
-        while iter_count < config.running_opts["max_iterations"]:
-            try:
-                sink_selected = random.choice(result)
-                result.remove(sink_selected)
-            except IndexError:
-                st.spinner("Error: No Feasible Route was found of the given distance")
-                st.session_state["running_route_results"] = None
-                return
+        results = []
+        for label in L.values():
+            label = label[-1]
+            if label.node in result:
+                if len(results) > 0:
+                    add = True
+                    for x in results:
+                        if route_similarity(x[-1],label.label_list) < config.running_opts["similarity_pct"]:
+                            continue
+                        else:
+                            add = False
+                            break
+                    if add:
+                        length_m = 0
+                        for i in range(0,len(label.label_list)-1):
+                            length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
 
-            #in case no route exists
-            while True:
-                try:
-                    route = nx.shortest_path(st.session_state["running_graph"],source_return, sink_selected, weight="cost", method='dijkstra')
-                    #nx shortest path is about a 10x improvement over osmnx
-                    break
-                except:
-                    #print(route)
-                    sink_selected = random.choice(result)
-                    result.remove(sink_selected)
-
-            sub = st.session_state["running_graph"].subgraph(route)
-
-            total_length = 0
-            total_cost = 0
-
-            #cut the route down to exact mileage
-            route_cut = []
-            for i in range(0, len(route)-1):
-                if total_length/1609.34 <= st.session_state["mileage"]:
-                    u = route[i]
-                    v = route[i + 1]
-                    route_cut.append(u)
-
-                    if sub.has_edge(u, v):
-                        total_length += st.session_state["running_graph"][u][v][0]["length"]*2
-                        total_cost += st.session_state["running_graph"][u][v][0]["cost"]
-
+                        results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
                 else:
-                    total_length -= st.session_state["running_graph"][route[i-2]][route[i-1]][0]["length"]*2
-                    break
+                    length_m = 0
+                    for i in range(0,len(label.label_list)-1):
+                        length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
+                    results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
 
-            sub = sub.subgraph(route_cut)
-            sink_selected = route_cut[-1]
+        #results = pareto_sort(results)
+        results = sorted(results, key = lambda x:sum(x[3]))
+        results = results[0:10]
 
-            if  len(results) == 0:
-                routes_generated+=1
-                results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
-                tabu_list.append(route_cut)
-                if total_cost < bestSeen:
-                    bestSeen = total_cost
-            else:
-                tabu = False
-
-                for x in tabu_list:
-                    if route_similarity(x,route_cut) > config.running_opts["tabu_similarity_pct"]:
-                        tabu=True
-                        break
-
-                if tabu == False:
-                    if(total_cost < bestSeen*(1 + config.running_opts["acceptable_variance_from_best"])):
-                        routes_generated+=1
-                        results.insert(0,[sub,source_return,sink_selected,total_cost, total_length, route_cut])
-                        tabu_list.insert(0,route_cut)
-                        if total_cost < bestSeen:
-                            bestSeen = total_cost
-
-
-            if len(tabu_list) > config.running_opts["tabu_list_length"]:
-                del tabu_list[-1]
-
-            iter_count+=1
-
-        #output
-        results.sort(key = lambda row: row[3])
-        results = results[0:config.running_opts["out_back_node_n"]]
         st.session_state["running_route_results"] = results
         st.session_state["route_iter"] = 0
-        st.session_state["route_iter_max"] = routes_generated + 1
+        st.session_state["route_iter_max"] = len(results)
 
 @st.cache_data(ttl=15*60) #refresh 15 min
 def nws_api():
@@ -353,25 +297,11 @@ def main():
     #widget inputs
     with st.sidebar:
         st.subheader("Optimization Preferences")
-        col1, col2 = st.columns([1,1])
-        with col1:
-            st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
-            st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
-            st.number_input("Avoid Roads with Speed Limit >", value=30,key="speed_restriction")
 
-            st.slider("Grade Importance: ", min_value=0, max_value=100, value=25, key="grade_weight")
-            st.slider("Turns Importance: ", min_value=0, max_value=100, value=25, key="turns_weight")
-            st.number_input("Number of Routes to Generate", value=config.running_opts["out_back_node_n"], key="routes_to_generate")
+        st.radio("Grade Preference", ["Flat","Steep"],key="elevation_type")
+        st.radio("Turn Preference", ["Many Turns","Few Turns"],key="turn_type")
+        st.write("Greenways, sidewalks, and other pedestrian-friendly paths are preferred by default. ")
 
-        with col2:
-            st.radio("Penalty",["Linear","Exponential"], key="elevation_penalty")
-            st.radio("Penalty",["Linear","Exponential"], key="turn_penalty")
-            st.toggle("Prefer Greenway", value=True,key="greenway_preference")
-
-            for x in range(0,1):
-                st.write(" ")
-            st.slider("Road Type Importance: ", min_value=0, max_value=100, value=25, key="road_type_weight")
-            st.slider("Speed Importance: ", min_value=0, max_value=100, value=25, key="speed_weight")
 
     map_mode = st.toggle("Select Start Location Via Map", key="select_map")
 
@@ -436,12 +366,35 @@ def main():
         route_line = LineString([(point.x, point.y, point.elevation) for point in route_nodes.itertuples()])
 
         gdf1 = geopandas.GeoDataFrame(geometry=[route_line], crs=osmnx.settings.default_crs)
-
         #check to ensure no length/origin parameter changes
         if str(gdf1["geometry"][0]) != "LINESTRING EMPTY":
+            elevation = route_nodes['elevation'].values*3.28084
+
+            # Calculate cumulative distance
+            distances = [0]
+            for i in range(0, len(route)-1):
+                try:
+                    distances.append(st.session_state["running_graph"].edges[route[i],route[i+1],0]["length"]/1609.34+distances[-1])
+                except:
+                    distances.append(distances[-1]+0)
+            # Plot elevation over distance using fig, ax style
+            fig, ax = plt.subplots(figsize=(7,4))
+            ax.plot(distances, elevation, marker='o', linestyle='-')
+            ax.set_xlabel('Distance (mi) ')
+            ax.set_ylabel('Elevation (ft)')
+            ax.set_title('Elevation')
+            ax.fill_between(distances, elevation, color='skyblue', alpha=0.4)
+            ax.set_ylim(min(elevation))
+
+            ax.grid(True)
+
+            st.pyplot(fig)
             st.write(f'Total Distance Out and Back: {np.round(st.session_state["running_route_results"][st.session_state["route_iter"]][4]/1609.34,2)} mi') #meter to mile conversion
-            st.write(f'Solution Quality Gap to Best Known: {round(100*((st.session_state["running_route_results"][st.session_state["route_iter"]][3]-st.session_state["running_route_results"][0][3])/st.session_state["running_route_results"][0][3]),2)}%')
-            ##GPX Download
+            st.write(f"**Elevation Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][0],2)}")
+            st.write(f"**Turn Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][1],2)}")
+            st.write(f"**Type Cost**: {round(st.session_state['running_route_results'][st.session_state['route_iter']][3][2],2)}")
+        ##GPX Download
+
 
             file_mem = BytesIO()
             gdf1.to_file(file_mem,'GPX')
@@ -456,7 +409,7 @@ def main():
                                   tooltip=address).add_to(m)
                     streamlit_folium.st_folium(m, height=700, width=700)
 
-            with st.expander("Weather Report"):
+            with st.expander("Weather"):
                 st.markdown(nws_api())
 
 if __name__ == "__main__":
