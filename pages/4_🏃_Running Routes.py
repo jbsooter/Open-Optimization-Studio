@@ -162,19 +162,12 @@ def type_cost(way):
         elif way["highway"] in ["service","residential","unclassified", "tertiary"]:
             type_cost = 50
     #prefer cycleways
+
     if way["highway"]  in ["cycleway","pedestrian","track","footway","path"]:
         type_cost  = 25
 
-    #prefer foot and bicycle designations
     if "foot" in way:
         if way["foot"] in ["designated","yes"]:
-            type_cost = 25
-    if "bicycle" in way:
-        if way["bicycle"] in ["designated","yes"]:
-                type_cost =25
-
-    if "natural" in way:
-        if way["natural"] in ["tree","water","wood"]:
             type_cost = 25
 
     return type_cost*way["length"]
@@ -192,7 +185,6 @@ def elevation_cost(node_a, node_b, way):
         return abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"])
     elif st.session_state["elevation_type"]   == "Steep":
         return (1.0 - abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"]))
-
 def build_route_mosp():
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
