@@ -65,43 +65,43 @@ def route_similarity(routeA,routeB):
 
     return sim_pct/min(len(routeA),len(routeB))
 
-def dominance_check(sol1, sol2):
-    c = sol1
-    cc = sol2
-
-    counter = 0
-
-    for i in range(0,len(c)):
-        if c[i] <= cc[i]:
-            #count the better objectives
-            if c[i] < cc[i]:
-                counter += 1
-        #if there is ever a worse, return false
-        if c[i] > cc[i]:
-            return False
-
-    if counter >= 1:
-        return True
-    else:
-        return False
-
-
-def pareto_sort(solutions):
-    dominance_count = [0] * len(solutions)
-
-    # calculate dominance count
-    for i in range(0,len(solutions)):
-        for j in range(0,len(solutions)):
-            if i != j:
-                if dominance_check(solutions[i][3], solutions[j][3]):
-                    dominance_count[j] += 1
-        solutions[i].append(dominance_count[j])
-
-    #sort based on relative dominance
-    sorted_solutions = sorted(solutions, key=lambda x: x[6])
-    sorted_solutions.reverse()
-
-    return sorted_solutions
+# def dominance_check(sol1, sol2):
+#     c = sol1
+#     cc = sol2
+#
+#     counter = 0
+#
+#     for i in range(0,len(c)):
+#         if c[i] <= cc[i]:
+#             #count the better objectives
+#             if c[i] < cc[i]:
+#                 counter += 1
+#         #if there is ever a worse, return false
+#         if c[i] > cc[i]:
+#             return False
+#
+#     if counter >= 1:
+#         return True
+#     else:
+#         return False
+#
+#
+# def pareto_sort(solutions):
+#     dominance_count = [0] * len(solutions)
+#
+#     # calculate dominance count
+#     for i in range(0,len(solutions)):
+#         for j in range(0,len(solutions)):
+#             if i != j:
+#                 if dominance_check(solutions[i][3], solutions[j][3]):
+#                     dominance_count[j] += 1
+#         solutions[i].append(dominance_count[j])
+#
+#     #sort based on relative dominance
+#     sorted_solutions = sorted(solutions, key=lambda x: x[6])
+#     sorted_solutions.reverse()
+#
+#     return sorted_solutions
 
 @st.cache_data()
 def build_graph(address,map_mode, mileage):

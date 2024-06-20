@@ -176,8 +176,8 @@ def one_to_all(G,source,num_objs):
 
 
         #print("iteration")
-        #print(count)
-        #count = count + 1
+        print(count)
+        count = count + 1
         #for x in L.values():
          #   print(x[-1])
         #    for xx in x:
