@@ -55,7 +55,7 @@ def build_cache_support(address, map_mode):
     #run build graph, if same, no queries, otherwise, queries update graph session state
     build_graph(address, map_mode, st.session_state["mileage"])
     #build route based on opt criteria
-    build_route_mosp()
+    build_route_mosp(address, map_mode,st.session_state["mileage"])
 
 def route_similarity(routeA,routeB):
     sim_pct = 0
@@ -185,7 +185,9 @@ def elevation_cost(node_a, node_b, way):
         return abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"])
     elif st.session_state["elevation_type"]   == "Steep":
         return 1.0 - abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"])
-def build_route_mosp():
+def build_route_mosp(address,map_mode, mileage):
+    if st.session_state["running_graph"] is None:
+        build_graph(address, map_mode,mileage+.01)
     with st.spinner("Computing Routes"):
         for u, v, data in st.session_state["running_graph"].edges(data=True):
             data["costs"] = [elevation_cost(u,v,data),
