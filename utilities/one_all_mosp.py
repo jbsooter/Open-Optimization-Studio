@@ -5,7 +5,7 @@ import time
 import networkx as nx
 import numpy as np
 
-infinity = np.Infinity
+infinity = np.inf
 
 class Label:
     def __init__(self, node, costs,predecessor):
