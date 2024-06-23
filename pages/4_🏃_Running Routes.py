@@ -63,7 +63,10 @@ def route_similarity(routeA,routeB):
         if node in routeB:
             sim_pct += 1
 
-    return sim_pct/min(len(routeA),len(routeB))
+    if routeA[-1] != routeB[-1]:
+        return sim_pct/min(len(routeA),len(routeB))
+    else:
+        return sim_pct/min(len(routeA),len(routeB)) + .1
 
 # def dominance_check(sol1, sol2):
 #     c = sol1
@@ -111,9 +114,9 @@ def build_graph(address,map_mode, mileage):
             rgs_b = []
             #combine all the filtered data thats requested
             for x in config.running_opts["osmnx_network_filters"]:
-                rgs.append(osmnx.graph_from_point(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
+                rgs.append(osmnx.graph_from_point(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                                                                              simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
-                rgs_b.append(osmnx.graph_from_point(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_point(address, dist=(1.0*mileage)*1609.34/2, dist_type='bbox',
                                                                                     simplify=False, retain_all=False, truncate_by_edge=False,custom_filter=x))
             #compose graphs and save in sess st
             st.session_state["running_graph"] = nx.compose_all(rgs)
@@ -126,10 +129,10 @@ def build_graph(address,map_mode, mileage):
             rgs = []
             rgs_b = []
             for x in config.running_opts["osmnx_network_filters"]:
-                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=0.8*mileage*1609.34/2, dist_type='bbox',
+                r_i, st.session_state["address_coords"] = osmnx.graph_from_address(address, dist=1.1*mileage*1609.34/2, dist_type='bbox',
                                                              simplify=False, retain_all=False, truncate_by_edge=False, return_coords=True,custom_filter=x, )
                 rgs.append(r_i)
-                rgs_b.append(osmnx.graph_from_address(address, dist=(0.7*mileage)*1609.34/2, dist_type='bbox',
+                rgs_b.append(osmnx.graph_from_address(address, dist=(1.0*mileage)*1609.34/2, dist_type='bbox',
                                                                                 simplify=False, retain_all=False, truncate_by_edge=False, return_coords=False,custom_filter=x))
             st.session_state["running_graph"] = nx.compose_all(rgs)
             st.session_state["running_boundary_graph"] = nx.compose_all(rgs_b)
@@ -405,7 +408,7 @@ def main():
 
             with map_location:
                 with colb:
-                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=15, tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
+                    m = folium.Map(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]], zoom_start=14, tiles=config.running_opts["map_tile"], attr=config.running_opts["map_tile_attr"])
                     folium.GeoJson(gdf1).add_to(m)
                     folium.Marker(location=[gdf1.geometry.iloc[0].coords[0][1],gdf1.geometry.iloc[0].coords[0][0]],
                                   tooltip=address).add_to(m)

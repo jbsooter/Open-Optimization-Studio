@@ -104,7 +104,7 @@ def nextCandidateLabel(v,lastProcessedLabel,sigma, L, G,num_objs):
         return None
     return l_v
 
-def propogate(l_v, w, H,L, G):
+def propogate(l_v, w, H,H_vector, L, G):
     l_new = Label(w,[label_costs + new_costs for label_costs, new_costs in zip(l_v.costs,G.edges[(l_v.node,w,0)]["costs"])], l_v)
 
     dominance_result = False
@@ -115,21 +115,27 @@ def propogate(l_v, w, H,L, G):
             break
 
     if dominance_result is False:
-        existing_labels = [label for label in H if label.node == w]
-        heapq.heapify(H)
-        if len(existing_labels) == 0:
+        existing_labels = False
+        if w in H_vector.keys():
+            existing_labels = True
+
+        if existing_labels is False:
             heapq.heappush(H, l_new)
-        elif l_new.__lt__(existing_labels[0]):
-            H.remove(existing_labels[0])
+            H_vector[w] = l_new
+        elif l_new.__lt__(H_vector[w]):
+            H.remove(H_vector[w])
             heapq.heapify(H)
             heapq.heappush(H, l_new)
-    return H
+            H_vector[w] = l_new
+    return H, H_vector
 
 def one_to_all(G,source,num_objs):
 
-    G = scale_edge_costs(G, num_objs)
+    #G = scale_edge_costs(G, num_objs)
     H = []
     heapq.heapify(H)
+
+    H_vector = {}
 
     L = {}
 
@@ -144,6 +150,7 @@ def one_to_all(G,source,num_objs):
         last_processed_label[a] = 0
 
     heapq.heappush(H, Label(source,num_objs*[0],None))
+    H_vector[source] = Label(source,num_objs*[0],None)
 
     #line 7
     count = 0
@@ -165,19 +172,20 @@ def one_to_all(G,source,num_objs):
         l_v_new = nextCandidateLabel(l_v_star.node,last_processed_label,u,L, G,num_objs)
         if l_v_new is not None:
             heapq.heappush(H,l_v_new)
+            H_vector[l_v_new.node] = l_v_new
 
         sigma_plus = []
         for u, v in G.out_edges(l_v_star.node):
             sigma_plus.append(v)
 
         for w in sigma_plus:
-            H = propogate(l_v_star,w,H,L,G)
-            heapq.heapify(H)
+            H, H_vector = propogate(l_v_star,w,H,H_vector, L,G)
 
-
-        #print("iteration")
-        #print(count)
-        #count = count + 1
+        #print(H_vector)
+    #print("iteration")
+        print(count)
+        count = count + 1
+        #print(len(H))
         #for x in L.values():
          #   print(x[-1])
         #    for xx in x:
