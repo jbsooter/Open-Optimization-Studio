@@ -149,13 +149,15 @@ def one_to_all(G,source,num_objs):
     for a in G.edges:
         last_processed_label[a] = 0
 
-    heapq.heappush(H, Label(source,num_objs*[0],None))
-    H_vector[source] = Label(source,num_objs*[0],None)
+    l_ll = Label(source,num_objs*[0],None)
+    heapq.heappush(H, l_ll)
+    H_vector[source] = l_ll
 
     #line 7
     count = 0
     while len(H) > 0:
         l_v_star = heapq.heappop(H)
+        #del H_vector[l_v_star.node]
         L[l_v_star.node].append(l_v_star)
 
         u = []
@@ -183,8 +185,8 @@ def one_to_all(G,source,num_objs):
 
         #print(H_vector)
     #print("iteration")
-        print(count)
-        count = count + 1
+        #print(count)
+        #count = count + 1
         #print(len(H))
         #for x in L.values():
          #   print(x[-1])

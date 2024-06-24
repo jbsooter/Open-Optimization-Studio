@@ -187,7 +187,8 @@ def elevation_cost(node_a, node_b, way):
     if st.session_state["elevation_type"] == "Flat":
         return abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"])
     elif st.session_state["elevation_type"]   == "Steep":
-        return 1.0 - abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"])
+        #use 1/grade to prevent negative
+        return np.nan_to_num(1.0,abs(st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"]/way["length"]),nan=0)
 def build_route_mosp(address,map_mode, mileage):
     if st.session_state["running_graph"] is None:
         build_graph(address, map_mode,mileage+.01)
