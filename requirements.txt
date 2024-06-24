@@ -6,7 +6,7 @@ streamlit-js-eval
 ortools
 openrouteservice
 osmnx == 1.7
-numpy
+numpy == 1.26.0
 pandas
 geopandas
 shapely

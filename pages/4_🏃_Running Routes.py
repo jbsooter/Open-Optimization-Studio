@@ -66,7 +66,7 @@ def route_similarity(routeA,routeB):
     if routeA[-1] != routeB[-1]:
         return sim_pct/min(len(routeA),len(routeB))
     else:
-        return sim_pct/min(len(routeA),len(routeB)) + .1
+        return sim_pct/min(len(routeA),len(routeB)) + .1 #penalize same dest
 
 # def dominance_check(sol1, sol2):
 #     c = sol1
