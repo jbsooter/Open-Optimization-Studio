@@ -190,6 +190,23 @@ def elevation_cost(node_a, node_b, way):
         #use 1/grade to prevent negative
 
         return 1.0/(abs((st.session_state["running_graph"].nodes()[node_b]["elevation"]-st.session_state["running_graph"].nodes()[node_a]["elevation"])/way["length"]) + .00001)
+
+def trim_route(label):
+    new_rt = []
+    new_rt.append(label.label_list[0])
+    total_dist = 0
+    total_cost = len(label.costs)*[0]
+    for i in range(1,len(label.label_list)):
+        new_rt.append(label.label_list[i])
+        print(label.label_list[i])
+        total_dist += st.session_state["running_graph"][new_rt[-2]][new_rt[-1]][0]["length"]*2
+        total_cost += label.costs
+        if total_dist/1609.34 > st.session_state["mileage"]:
+            break
+    label.label_list = new_rt.copy()
+    return label
+
+
 def build_route_mosp(address,map_mode, mileage):
     if st.session_state["running_graph"] is None:
         build_graph(address, map_mode,mileage+.01)
@@ -219,6 +236,7 @@ def build_route_mosp(address,map_mode, mileage):
         for label in L.values():
             label = label[-1]
             if label.node in result:
+                label = trim_route(label)
                 if len(results) > 0:
                     add = True
                     for x in results:
@@ -234,6 +252,7 @@ def build_route_mosp(address,map_mode, mileage):
 
                         results.append([st.session_state["running_graph"].subgraph(label.label_list),source_return,label.node,label.costs,length_m,label.label_list])
                 else:
+                    label = trim_route(label)
                     length_m = 0
                     for i in range(0,len(label.label_list)-1):
                         length_m += st.session_state["running_graph"][label.label_list[i]][label.label_list[i+1]][0]["length"]*2
